@@ -34,11 +34,13 @@ html, body {
   color: #f3f4f6;
   min-height: 100vh;
   overflow-x: hidden;
+  max-width: 100vw;
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-/* App Container & Symmetrical Layout */
+/* App Container & Precise PC Grid Layout */
 .sp5-container {
   max-width: 1380px;
   width: 95%;
@@ -46,37 +48,75 @@ html, body {
   padding: 20px;
   padding-bottom: 90px;
   position: relative;
-}
-
-.sp5-main-layout {
   display: grid;
   grid-template-columns: 280px 1fr;
+  grid-template-rows: auto auto;
   gap: 24px;
   align-items: start;
 }
 
 .sp5-sidebar {
+  grid-column: 1 / 2;
+  grid-row: 1 / 3;
   width: 100%;
   position: sticky;
   top: 20px;
 }
 
-.sp5-content-area {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.sp5-header {
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
 }
 
-@media (max-width: 960px) {
-  .sp5-main-layout {
+.sp5-floor-grid {
+  grid-column: 2 / 3;
+  grid-row: 2 / 3;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 4px 0;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
+@media (min-width: 1200px) {
+  .sp5-floor-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .sp5-container {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    padding: 12px;
+    width: 100%;
+    max-width: 100vw;
+  }
+  .sp5-header {
+    order: 1;
+    grid-column: auto;
+    grid-row: auto;
   }
   .sp5-sidebar {
+    order: 2;
+    grid-column: auto;
+    grid-row: auto;
     position: static;
+    width: 100%;
+  }
+  .sp5-floor-grid {
+    order: 3;
+    grid-column: auto;
+    grid-row: auto;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 540px) and (max-width: 900px) {
+  .sp5-floor-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -106,6 +146,14 @@ html, body {
   gap: 12px;
   border-bottom: 2px dashed rgba(255, 255, 255, 0.2);
   padding-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+  .sp5-header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 
 .sp5-title-area h1 {
@@ -201,6 +249,12 @@ html, body {
   flex-wrap: wrap;
 }
 
+@media (max-width: 900px) {
+  .sp5-controls {
+    flex-direction: column;
+  }
+}
+
 .sp5-search-input {
   flex: 1;
   min-width: 200px;
@@ -247,18 +301,17 @@ html, body {
   background: #047857;
 }
 
+@media (max-width: 900px) {
+  .sp5-action-btn.share {
+    width: 100%;
+  }
+}
+
 /* Quick Filters Bar (Notebook Tabs style) */
 .sp5-filters-bar {
   display: flex;
   gap: 8px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding-bottom: 4px;
-}
-.sp5-filters-bar::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
 }
 
 .sp5-filter-pill {
@@ -362,32 +415,6 @@ html, body {
   background: linear-gradient(90deg, #fde047 0%, #f59e0b 100%);
   border-radius: 3px;
   transition: width 0.6s ease;
-}
-
-/* Floor Grid (4 columns on PC) */
-.sp5-floor-grid {
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 20px;
-  padding: 4px 0;
-}
-
-@media (min-width: 540px) {
-  .sp5-floor-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 900px) {
-  .sp5-floor-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (min-width: 1200px) {
-  .sp5-floor-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 /* Paper Card Styles with Scotch Tape */
@@ -523,13 +550,14 @@ html, body {
 /* Floating Bottom Button (+ Rzuć swoją kartkę) */
 .sp5-fab-container {
   position: fixed;
-  bottom: 24px;
+  bottom: 16px;
   left: 0;
   right: 0;
   display: flex;
   justify-content: center;
   z-index: 90;
   pointer-events: none;
+  padding: 0 12px;
 }
 
 .sp5-fab {
@@ -538,9 +566,9 @@ html, body {
   color: var(--chalk-yellow);
   border: 3px solid var(--wood-frame);
   border-radius: 30px;
-  padding: 14px 30px;
+  padding: 14px 20px;
   min-height: 48px;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 800;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
   cursor: pointer;
@@ -549,6 +577,8 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  width: 100%;
+  max-width: 420px;
 }
 
 .sp5-fab:hover {
@@ -816,6 +846,38 @@ html, body {
   margin-bottom: 8px;
 }
 
+.empty-state.chalkboard-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.chalkboard-message-box {
+  background: #1B3B2B;
+  border: 5px solid #8B5A2B;
+  border-radius: 16px;
+  padding: 32px 24px;
+  max-width: 500px;
+  text-align: center;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
+  color: #F8F9FA;
+}
+
+.chalkboard-message-box h3 {
+  font-size: 1.4rem;
+  color: #FDE047;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.chalkboard-message-box p {
+  color: #a7f3d0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
 @keyframes bounceScale {
   0% { transform: scale(1); }
   50% { transform: scale(1.3); }
@@ -834,10 +896,20 @@ html, body {
   transition: transform 0.15s ease, background 0.2s ease;
 }
 
+.respect-btn.respected {
+  background: #059669;
+  color: #fff;
+}
+
 .respect-btn:active {
   animation: bounceScale 0.25s ease;
 }
 
 .sp5-card.gold .respect-btn {
   background: rgba(251, 191, 36, 0.2);
+}
+
+.sp5-card.gold .respect-btn.respected {
+  background: #059669;
+  color: #fff;
 }

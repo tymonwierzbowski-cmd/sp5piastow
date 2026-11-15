@@ -43,19 +43,21 @@ function isValidSp5Class(className: string): boolean {
 export async function GET(req: Request) {
   try {
     if (!supabase) {
-      return NextResponse.json({ notes: inMemoryNotes, source: 'memory' });
+      const safeNotes = inMemoryNotes.map(({ ip_address, ...rest }) => rest);
+      return NextResponse.json({ notes: safeNotes, source: 'memory' });
     }
 
     const { data, error } = await supabase
       .from('sp5_notes')
-      .select('*')
+      .select('id, first_name, last_name, class_name, year_written, message, paper_style, rotation, respect_count, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
       return NextResponse.json({ notes: [], error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ notes: data || [], source: 'supabase' });
+    const safeData = data || [];
+    return NextResponse.json({ notes: safeData, source: 'supabase' });
   } catch (err: any) {
     return NextResponse.json({ notes: [], source: 'error-fallback', error: err.message });
   }
@@ -120,7 +122,8 @@ export async function POST(req: Request) {
       } else {
         inMemoryNotes.push(newNote);
       }
-      return NextResponse.json({ success: true, note: newNote });
+      const { ip_address: _, ...safeNote } = newNote;
+      return NextResponse.json({ success: true, note: safeNote });
     }
 
     if (!checkIsCreator) {
@@ -149,7 +152,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from('sp5_notes')
       .insert([insertPayload])
-      .select()
+      .select('id, first_name, last_name, class_name, year_written, message, paper_style, rotation, respect_count, created_at')
       .single();
 
     if (error) {

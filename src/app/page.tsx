@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 interface Note {
@@ -46,13 +46,14 @@ const bellSchedule = [
 interface NoteCardProps {
   note: Note;
   isCreator: boolean;
+  isRespected: boolean;
   onCardClick: (note: Note) => void;
   onRespect: (id: string, e: React.MouseEvent) => void;
   onDelete: (id: string, e: React.MouseEvent) => void;
   onMakeGold: (id: string, e: React.MouseEvent) => void;
 }
 
-const NoteCard = React.memo(({ note, isCreator, onCardClick, onRespect, onDelete, onMakeGold }: NoteCardProps) => {
+const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onRespect, onDelete, onMakeGold }: NoteCardProps) => {
   const isNoteCreator =
     note.first_name.toLowerCase() === 'tymon' &&
     note.last_name.toLowerCase() === 'wierzbowski';
@@ -94,11 +95,14 @@ const NoteCard = React.memo(({ note, isCreator, onCardClick, onRespect, onDelete
           {isNoteCreator && '👑'}
         </span>
         <button
-          className="sp5-respect-badge respect-btn"
-          onClick={(e) => onRespect(note.id, e)}
-          title="Kliknij, aby dać Szacun (+1)"
+          className={`sp5-respect-badge respect-btn ${isRespected ? 'respected' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRespect(note.id, e);
+          }}
+          title={isRespected ? 'Już dałeś Szacun tej kartce!' : 'Kliknij, aby dać Szacun (+1)'}
         >
-          🔥 {note.respect_count}
+          {isRespected ? `✓ Szacun (${note.respect_count})` : `🔥 ${note.respect_count}`}
         </button>
       </div>
     </div>
@@ -132,6 +136,7 @@ function SzkolnaPodlogaApp() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'gold' | 'top' | 'class8' | 'class7' | 'class6'>('all');
+  const [respectedNotes, setRespectedNotes] = useState<string[]>([]);
 
   // Add Note Modal
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -165,6 +170,13 @@ function SzkolnaPodlogaApp() {
       }
     } else {
       setOnboardingOpen(true);
+    }
+
+    const savedRespected = localStorage.getItem('sp5_respected_notes');
+    if (savedRespected) {
+      try {
+        setRespectedNotes(JSON.parse(savedRespected));
+      } catch (e) {}
     }
 
     fetchNotes();
@@ -280,10 +292,11 @@ function SzkolnaPodlogaApp() {
 
       if (res.ok && data.success) {
         setFormSuccess('Kartka została pomyślnie rzucona na szkolną podłogę! 🎉');
+        setMessageInput('');
+        await fetchNotes();
         setTimeout(() => {
           setAddModalOpen(false);
-          fetchNotes();
-        }, 1200);
+        }, 1000);
       } else {
         setFormError(data.error || 'Nie udało się rzucić kartki.');
       }
@@ -294,8 +307,18 @@ function SzkolnaPodlogaApp() {
     }
   };
 
-  const handleRespect = async (id: string, e?: React.MouseEvent) => {
+  const handleRespect = useCallback(async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+
+    if (!isCreator && respectedNotes.includes(id)) {
+      return; // already respected
+    }
+
+    const updatedRespected = isCreator ? respectedNotes : [...respectedNotes, id];
+    if (!isCreator) {
+      setRespectedNotes(updatedRespected);
+      localStorage.setItem('sp5_respected_notes', JSON.stringify(updatedRespected));
+    }
 
     // Optimistic update
     setNotes(prev =>
@@ -323,9 +346,9 @@ function SzkolnaPodlogaApp() {
     } catch (err) {
       console.error('Błąd przyznawania szacunku:', err);
     }
-  };
+  }, [isCreator, respectedNotes, activeCard]);
 
-  const handleDeleteNote = async (id: string) => {
+  const handleDeleteNote = useCallback(async (id: string) => {
     if (!confirm('Czy na pewno chcesz usunąć tę kartkę (uprawnienia Twórcy)?')) return;
     try {
       const res = await fetch(`/api/notes?id=${id}&admin=sp5admin2026`, {
@@ -342,9 +365,9 @@ function SzkolnaPodlogaApp() {
     } catch (err) {
       alert('Błąd połączenia.');
     }
-  };
+  }, []);
 
-  const handleMakeGold = async (id: string) => {
+  const handleMakeGold = useCallback(async (id: string) => {
     if (!confirm('Czy zamienić tę kartkę w Złotą Legendę i przypiąć na górę?')) return;
     try {
       const res = await fetch('/api/notes', {
@@ -365,7 +388,7 @@ function SzkolnaPodlogaApp() {
     } catch (err) {
       alert('Błąd połączenia.');
     }
-  };
+  }, []);
 
   const handleShare = () => {
     const url = window.location.href;
@@ -407,229 +430,230 @@ function SzkolnaPodlogaApp() {
     }
   });
 
-  // Calculate Top 5 classes ranking (Score = (notesCount * 10) + respectSum)
-  const classStats: { [key: string]: { notesCount: number; respectSum: number; score: number } } = {};
-  notes.forEach(n => {
-    const cl = n.class_name.toUpperCase().trim();
-    if (!cl) return;
-    if (!classStats[cl]) {
-      classStats[cl] = { notesCount: 0, respectSum: 0, score: 0 };
-    }
-    classStats[cl].notesCount += 1;
-    classStats[cl].respectSum += (n.respect_count || 0);
-  });
+  const rankedClasses = useMemo(() => {
+    const classStats: { [key: string]: { notesCount: number; respectSum: number; score: number } } = {};
+    notes.forEach(n => {
+      const cl = n.class_name.toUpperCase().trim();
+      if (!cl) return;
+      if (!classStats[cl]) {
+        classStats[cl] = { notesCount: 0, respectSum: 0, score: 0 };
+      }
+      classStats[cl].notesCount += 1;
+      classStats[cl].respectSum += (n.respect_count || 0);
+    });
 
-  const rankedClasses = Object.entries(classStats)
-    .map(([className, stats]) => ({
-      className,
-      notesCount: stats.notesCount,
-      respectSum: stats.respectSum,
-      score: (stats.notesCount * 10) + stats.respectSum
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+    return Object.entries(classStats)
+      .map(([className, stats]) => ({
+        className,
+        notesCount: stats.notesCount,
+        respectSum: stats.respectSum,
+        score: (stats.notesCount * 10) + stats.respectSum
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }, [notes]);
 
   const topLeaderScore = rankedClasses.length > 0 ? rankedClasses[0].score : 1;
 
-  const filteredNotes = notes.filter(n => {
-    if (selectedFilter === 'gold' && n.paper_style !== 'gold') return false;
-    if (selectedFilter === 'top' && (n.respect_count || 0) < 20) return false;
-    if (selectedFilter === 'class8' && !n.class_name.toUpperCase().startsWith('8')) return false;
-    if (selectedFilter === 'class7' && !n.class_name.toUpperCase().startsWith('7')) return false;
-    if (selectedFilter === 'class6' && !n.class_name.toUpperCase().startsWith('6')) return false;
+  const filteredNotes = useMemo(() => {
+    return notes.filter(n => {
+      if (selectedFilter === 'gold' && n.paper_style !== 'gold') return false;
+      if (selectedFilter === 'top' && (n.respect_count || 0) < 20) return false;
+      if (selectedFilter === 'class8' && !n.class_name.toUpperCase().startsWith('8')) return false;
+      if (selectedFilter === 'class7' && !n.class_name.toUpperCase().startsWith('7')) return false;
+      if (selectedFilter === 'class6' && !n.class_name.toUpperCase().startsWith('6')) return false;
 
-    const q = searchQuery.toLowerCase();
-    if (!q) return true;
-    return (
-      n.first_name.toLowerCase().includes(q) ||
-      n.last_name.toLowerCase().includes(q) ||
-      n.class_name.toLowerCase().includes(q) ||
-      n.message.toLowerCase().includes(q) ||
-      String(n.year_written).includes(q)
-    );
-  });
+      const q = searchQuery.toLowerCase();
+      if (!q) return true;
+      return (
+        n.first_name.toLowerCase().includes(q) ||
+        n.last_name.toLowerCase().includes(q) ||
+        n.class_name.toLowerCase().includes(q) ||
+        n.message.toLowerCase().includes(q) ||
+        String(n.year_written).includes(q)
+      );
+    });
+  }, [notes, selectedFilter, searchQuery]);
 
   const currentYear = new Date().getFullYear();
 
   return (
     <div className="sp5-container">
-      <div className="sp5-main-layout">
-        {/* Permanent Sidebar Ranking Panel */}
-        <aside className="sp5-sidebar">
-          <div className="sp5-ranking-sidebar-card">
-            <h3 className="sp5-sidebar-title">🏆 Ranking TOP 5 Klas</h3>
-            <p className="sp5-sidebar-subtitle">Puchar Podłogi SP5 (Punkty = Kartek×10 + Szacun)</p>
-            <div className="sp5-ranking-list">
-              {rankedClasses.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '0.85rem' }}>Brak danych o klasach</p>
-              ) : (
-                rankedClasses.map((item, idx) => {
-                  const progressPct = topLeaderScore > 0 ? Math.round((item.score / topLeaderScore) * 100) : 0;
-                  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-                  return (
-                    <div key={item.className} className="sp5-ranking-item">
-                      <div className="sp5-ranking-row-top">
-                        <span className="sp5-ranking-place">
-                          {medals[idx] || `${idx + 1}.`} <strong>Klasa {item.className}</strong>
-                        </span>
-                        <span className="sp5-ranking-score">
-                          {item.score} pkt <span className="sp5-ranking-details">({item.notesCount} kartek, 🔥 {item.respectSum})</span>
-                        </span>
-                      </div>
-                      <div className="sp5-ranking-bar-bg">
-                        <div className="sp5-ranking-bar-fill" style={{ width: `${progressPct}%` }}></div>
-                      </div>
+      {/* Permanent Sidebar Ranking Panel */}
+      <aside className="sp5-sidebar">
+        <div className="sp5-ranking-sidebar-card">
+          <h3 className="sp5-sidebar-title">🏆 Ranking TOP 5 Klas</h3>
+          <p className="sp5-sidebar-subtitle">Puchar Klas SP5 • Punkty za kartki i Szacun</p>
+          <div className="sp5-ranking-list">
+            {rankedClasses.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#a7f3d0', fontSize: '0.85rem' }}>
+                Brak punktów — rzuć kartkę, aby Twoja klasa objęła prowadzenie!
+              </p>
+            ) : (
+              rankedClasses.map((item, idx) => {
+                const progressPct = topLeaderScore > 0 ? Math.round((item.score / topLeaderScore) * 100) : 0;
+                const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+                return (
+                  <div key={item.className} className="sp5-ranking-item">
+                    <div className="sp5-ranking-row-top">
+                      <span className="sp5-ranking-place">
+                        {medals[idx] || `${idx + 1}.`} <strong>Klasa {item.className}</strong>
+                      </span>
+                      <span className="sp5-ranking-score">
+                        {item.score} pkt <span className="sp5-ranking-details">({item.notesCount} kartek, 🔥 {item.respectSum})</span>
+                      </span>
                     </div>
-                  );
-                })
-              )}
+                    <div className="sp5-ranking-bar-bg">
+                      <div className="sp5-ranking-bar-fill" style={{ width: `${progressPct}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* Header & Controls */}
+      <header className="sp5-header">
+        <div className="sp5-header-top">
+          <div className="sp5-title-area">
+            <h1>🏫 SZKOLNA PODŁOGA SP5 PIASTÓW</h1>
+            <p>Porozrzucane kartki z pamiątkami uczniów</p>
+          </div>
+
+          <div className="sp5-user-badge-area">
+            {profile && (
+              <div className="sp5-user-badge">
+                <span>
+                  {profile.firstName} {profile.lastName} ({profile.className})
+                </span>
+                {isCreator && <span className="sp5-creator-badge">👑 TWÓRCA STRONY</span>}
+                <button
+                  className="sp5-change-btn"
+                  onClick={() => {
+                    setFirstNameInput(profile.firstName);
+                    setLastNameInput(profile.lastName);
+                    setClassInput(profile.className);
+                    setOnboardingOpen(true);
+                  }}
+                >
+                  Zmień dane
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* School HUD Stats */}
+        <div className="sp5-hud-stats">
+          <div className="sp5-hud-item">
+            🏆 Najbardziej aktywna klasa: <strong>{activeClass}</strong>
+          </div>
+          <div className="sp5-hud-item">
+            ⏰ Zegar SP5: <strong>{bellStatus}</strong>
+          </div>
+          <div className="sp5-hud-item">
+            📄 Kartek na podłodze: <strong>{notes.length}</strong>
+          </div>
+          {isCreator && (
+            <div className="sp5-hud-item" style={{ color: '#fbbf24' }}>
+              ✨ Tryb Twórcy aktywny (Brak limitu IP, Pełna Edycja)
+            </div>
+          )}
+        </div>
+
+        <div className="sp5-controls">
+          <input
+            type="text"
+            className="sp5-search-input"
+            placeholder="Szukaj po imieniu, klasie lub treści..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+          <button className="sp5-action-btn share" onClick={handleShare}>
+            🔗 Udostępnij link
+          </button>
+        </div>
+
+        {/* Quick Filters Bar */}
+        <div className="sp5-filters-bar">
+          <button
+            className={`sp5-filter-pill ${selectedFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setSelectedFilter('all')}
+          >
+            Wszystkie
+          </button>
+          <button
+            className={`sp5-filter-pill ${selectedFilter === 'gold' ? 'active' : ''}`}
+            onClick={() => setSelectedFilter('gold')}
+          >
+            👑 Złote Legendy
+          </button>
+          <button
+            className={`sp5-filter-pill ${selectedFilter === 'top' ? 'active' : ''}`}
+            onClick={() => setSelectedFilter('top')}
+          >
+            🔥 Top Szacun
+          </button>
+          <button
+            className={`sp5-filter-pill ${selectedFilter === 'class8' ? 'active' : ''}`}
+            onClick={() => setSelectedFilter('class8')}
+          >
+            Klasy 8
+          </button>
+          <button
+            className={`sp5-filter-pill ${selectedFilter === 'class7' ? 'active' : ''}`}
+            onClick={() => setSelectedFilter('class7')}
+          >
+            Klasy 7
+          </button>
+          <button
+            className={`sp5-filter-pill ${selectedFilter === 'class6' ? 'active' : ''}`}
+            onClick={() => setSelectedFilter('class6')}
+          >
+            Klasy 6
+          </button>
+        </div>
+      </header>
+
+      {/* Floor Grid */}
+      <main className="sp5-floor-grid">
+        {loading ? (
+          <div className="empty-state">
+            <h3>Zbieranie kartek z podłogi...</h3>
+          </div>
+        ) : filteredNotes.length === 0 ? (
+          <div className="empty-state chalkboard-empty">
+            <div className="chalkboard-message-box">
+              <h3>Podłoga jest jeszcze czysta!</h3>
+              <p>Bądź pierwszą osobą z SP5 Piastów, która rzuci tu swoją kartkę.</p>
+              <button className="sp5-btn-primary" onClick={handleOpenAddModal} style={{ marginTop: '16px' }}>
+                + Rzuć pierwszą kartkę
+              </button>
             </div>
           </div>
-        </aside>
-
-        {/* Content Area */}
-        <div className="sp5-content-area">
-          {/* Header & Controls */}
-          <header className="sp5-header">
-            <div className="sp5-header-top">
-              <div className="sp5-title-area">
-                <h1>🏫 SZKOLNA PODŁOGA SP5 PIASTÓW</h1>
-                <p>Porozrzucane kartki z pamiątkami uczniów</p>
-              </div>
-
-              <div className="sp5-user-badge-area">
-                {profile && (
-                  <div className="sp5-user-badge">
-                    <span>
-                      {profile.firstName} {profile.lastName} ({profile.className})
-                    </span>
-                    {isCreator && <span className="sp5-creator-badge">👑 TWÓRCA STRONY</span>}
-                    <button
-                      className="sp5-change-btn"
-                      onClick={() => {
-                        setFirstNameInput(profile.firstName);
-                        setLastNameInput(profile.lastName);
-                        setClassInput(profile.className);
-                        setOnboardingOpen(true);
-                      }}
-                    >
-                      Zmień dane
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* School HUD Stats */}
-            <div className="sp5-hud-stats">
-              <div className="sp5-hud-item">
-                🏆 Najbardziej aktywna klasa: <strong>{activeClass}</strong>
-              </div>
-              <div className="sp5-hud-item">
-                ⏰ Zegar SP5: <strong>{bellStatus}</strong>
-              </div>
-              <div className="sp5-hud-item">
-                📄 Kartek na podłodze: <strong>{notes.length}</strong>
-              </div>
-              {isCreator && (
-                <div className="sp5-hud-item" style={{ color: '#fbbf24' }}>
-                  ✨ Tryb Twórcy aktywny (Brak limitu IP, Pełna Edycja)
-                </div>
-              )}
-            </div>
-
-            <div className="sp5-controls">
-              <input
-                type="text"
-                className="sp5-search-input"
-                placeholder="Szukaj po imieniu, klasie lub treści..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-              <button className="sp5-action-btn share" onClick={handleShare}>
-                🔗 Udostępnij link
-              </button>
-            </div>
-
-            {/* Quick Filters Bar */}
-            <div className="sp5-filters-bar">
-              <button
-                className={`sp5-filter-pill ${selectedFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setSelectedFilter('all')}
-              >
-                Wszystkie
-              </button>
-              <button
-                className={`sp5-filter-pill ${selectedFilter === 'gold' ? 'active' : ''}`}
-                onClick={() => setSelectedFilter('gold')}
-              >
-                👑 Złote Legendy
-              </button>
-              <button
-                className={`sp5-filter-pill ${selectedFilter === 'top' ? 'active' : ''}`}
-                onClick={() => setSelectedFilter('top')}
-              >
-                🔥 Top Szacun
-              </button>
-              <button
-                className={`sp5-filter-pill ${selectedFilter === 'class8' ? 'active' : ''}`}
-                onClick={() => setSelectedFilter('class8')}
-              >
-                Klasy 8
-              </button>
-              <button
-                className={`sp5-filter-pill ${selectedFilter === 'class7' ? 'active' : ''}`}
-                onClick={() => setSelectedFilter('class7')}
-              >
-                Klasy 7
-              </button>
-              <button
-                className={`sp5-filter-pill ${selectedFilter === 'class6' ? 'active' : ''}`}
-                onClick={() => setSelectedFilter('class6')}
-              >
-                Klasy 6
-              </button>
-            </div>
-          </header>
-
-          {/* Floor Grid */}
-          <main className="sp5-floor-grid">
-            {loading ? (
-              <div className="empty-state">
-                <h3>Zbieranie kartek z podłogi...</h3>
-              </div>
-            ) : filteredNotes.length === 0 ? (
-              <div className="empty-state chalkboard-empty">
-                <div className="chalkboard-message-box">
-                  <h3>Podłoga jest jeszcze czysta!</h3>
-                  <p>Bądź pierwszą osobą z SP5 Piastów, która rzuci tu swoją kartkę.</p>
-                  <button className="sp5-btn-primary" onClick={handleOpenAddModal} style={{ marginTop: '16px' }}>
-                    + Rzuć pierwszą kartkę
-                  </button>
-                </div>
-              </div>
-            ) : (
-              filteredNotes.map(note => (
-                <NoteCard
-                  key={note.id}
-                  note={note}
-                  isCreator={isCreator}
-                  onCardClick={setActiveCard}
-                  onRespect={handleRespect}
-                  onDelete={(id, e) => {
-                    e.stopPropagation();
-                    handleDeleteNote(id);
-                  }}
-                  onMakeGold={(id, e) => {
-                    e.stopPropagation();
-                    handleMakeGold(id);
-                  }}
-                />
-              ))
-            )}
-          </main>
-        </div>
-      </div>
+        ) : (
+          filteredNotes.map(note => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              isCreator={isCreator}
+              isRespected={respectedNotes.includes(note.id)}
+              onCardClick={setActiveCard}
+              onRespect={handleRespect}
+              onDelete={(id, e) => {
+                e.stopPropagation();
+                handleDeleteNote(id);
+              }}
+              onMakeGold={(id, e) => {
+                e.stopPropagation();
+                handleMakeGold(id);
+              }}
+            />
+          ))
+        )}
+      </main>
 
       {/* Floating Action Button (+ Rzuć swoją kartkę) */}
       <div className="sp5-fab-container">
