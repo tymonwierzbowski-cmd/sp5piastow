@@ -151,9 +151,9 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
             e.stopPropagation();
             onRespect(note.id, e);
           }}
-          title={isRespected ? 'Już dałeś Szacun tej kartce!' : 'Kliknij, aby dać Szacun (+1)'}
+          title={isRespected ? 'Kliknij ponownie, aby cofnąć Szacun' : 'Kliknij, aby dać Szacun (+1)'}
         >
-          {isRespected ? `✓ Szacun (${note.respect_count})` : `🔥 ${note.respect_count}`}
+          {isRespected ? `✓ Dano Szacun (${note.respect_count})` : `🔥 Szacun (${note.respect_count})`}
         </button>
       </div>
     </div>
@@ -338,29 +338,32 @@ function SzkolnaPodlogaApp() {
   const handleRespect = useCallback(async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
-    if (!isCreator && respectedNotes.includes(id)) {
-      return; // already respected
-    }
+    const isAlreadyRespected = respectedNotes.includes(id);
+    const updatedRespected = isAlreadyRespected
+      ? respectedNotes.filter(item => item !== id)
+      : [...respectedNotes, id];
 
-    const updatedRespected = isCreator ? respectedNotes : [...respectedNotes, id];
     if (!isCreator) {
       setRespectedNotes(updatedRespected);
       localStorage.setItem('sp5_respected_notes', JSON.stringify(updatedRespected));
     }
 
+    const delta = isAlreadyRespected ? -1 : 1;
+
     // Optimistic update
     setNotes(prev =>
-      prev.map(n => (n.id === id ? { ...n, respect_count: (n.respect_count || 0) + 1 } : n))
+      prev.map(n => (n.id === id ? { ...n, respect_count: Math.max(0, (n.respect_count || 0) + delta) } : n))
     );
     if (activeCard && activeCard.id === id) {
-      setActiveCard(prev => (prev ? { ...prev, respect_count: (prev.respect_count || 0) + 1 } : null));
+      setActiveCard(prev => (prev ? { ...prev, respect_count: Math.max(0, (prev.respect_count || 0) + delta) } : null));
     }
 
     try {
+      const actionType = isAlreadyRespected ? 'unrespect' : 'respect';
       const res = await fetch('/api/notes', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: 'respect' })
+        body: JSON.stringify({ id, action: actionType })
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -372,7 +375,7 @@ function SzkolnaPodlogaApp() {
         }
       }
     } catch (err) {
-      console.error('Błąd przyznawania szacunku:', err);
+      console.error('Błąd zmiany szacunku:', err);
     }
   }, [isCreator, respectedNotes, activeCard]);
 

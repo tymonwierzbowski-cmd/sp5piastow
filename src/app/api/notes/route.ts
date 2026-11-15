@@ -207,11 +207,12 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Brak ID kartki.' }, { status: 400 });
     }
 
-    if (action === 'respect') {
+    if (action === 'respect' || action === 'unrespect') {
+      const delta = action === 'respect' ? 1 : -1;
       if (!supabase) {
         const note = inMemoryNotes.find(n => n.id === id);
         if (note) {
-          note.respect_count += 1;
+          note.respect_count = Math.max(0, (note.respect_count || 0) + delta);
           return NextResponse.json({ success: true, respect_count: note.respect_count });
         }
         return NextResponse.json({ error: 'Nie znaleziono kartki.' }, { status: 404 });
@@ -227,7 +228,7 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: 'Nie znaleziono kartki.' }, { status: 404 });
       }
 
-      const newCount = (current.respect_count || 0) + 1;
+      const newCount = Math.max(0, (current.respect_count || 0) + delta);
       const { error: updateErr } = await supabase
         .from('sp5_notes')
         .update({ respect_count: newCount })
