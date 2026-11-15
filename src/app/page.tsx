@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { supabaseClient } from '@/lib/supabase';
 
 interface Note {
   id: string;
@@ -14,12 +15,14 @@ interface Note {
   rotation: number;
   respect_count: number;
   created_at: string;
+  user_email?: string;
 }
 
 interface StudentProfile {
   firstName: string;
   lastName: string;
   className: string;
+  email?: string;
   deviceMode?: 'mobile' | 'pc';
 }
 
@@ -153,7 +156,7 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
           }}
           title={isRespected ? 'Kliknij ponownie, aby cofnąć Szacun' : 'Kliknij, aby dać Szacun (+1)'}
         >
-          {isRespected ? `✓ Dano Szacun (${note.respect_count})` : `🔥 Szacun (${note.respect_count})`}
+          {isRespected ? `✓ Dano Szacun (${note.respect_count})` : `👏 Szacun (${note.respect_count})`}
         </button>
       </div>
     </div>
@@ -180,10 +183,15 @@ function SzkolnaPodlogaApp() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(true);
   const [deviceSelected, setDeviceSelected] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
   const [firstNameInput, setFirstNameInput] = useState('');
   const [lastNameInput, setLastNameInput] = useState('');
   const [classInput, setClassInput] = useState('8A');
   const [deviceMode, setDeviceMode] = useState<'mobile' | 'pc'>('pc');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,7 +218,6 @@ function SzkolnaPodlogaApp() {
       profile.lastName.trim().toLowerCase() === 'wierzbowski');
 
   useEffect(() => {
-    // Always start with deviceSelected = false on every load/refresh
     setDeviceSelected(false);
     setOnboardingOpen(true);
 
@@ -222,40 +229,24 @@ function SzkolnaPodlogaApp() {
         if (parsed.firstName) setFirstNameInput(parsed.firstName);
         if (parsed.lastName) setLastNameInput(parsed.lastName);
         if (parsed.className) setClassInput(parsed.className);
+        if (parsed.email) setEmailInput(parsed.email);
         if (parsed.deviceMode) setDeviceMode(parsed.deviceMode);
       } catch (e) {}
     }
 
-    const savedRespected = localStorage.getItem('sp5_respected_notes');
-    if (savedRespected) {
-      try {
-        setRespectedNotes(JSON.parse(savedRespected));
-      } catch (e) {}
-    }
-
-    fetchNotes();
+    fetchNotes(profile?.email);
   }, []);
 
-  const handleSelectDevice = (mode: 'mobile' | 'pc') => {
-    setDeviceMode(mode);
-    setDeviceSelected(true);
-
-    if (profile && profile.firstName && profile.lastName && profile.className) {
-      const updated: StudentProfile = { ...profile, deviceMode: mode };
-      setProfile(updated);
-      localStorage.setItem('sp5_student_profile', JSON.stringify(updated));
-      setOnboardingOpen(false);
-    } else {
-      // Keep onboarding open to collect name/class
-    }
-  };
-
-  const fetchNotes = async () => {
+  const fetchNotes = async (userEmail?: string) => {
     try {
-      const res = await fetch('/api/notes');
+      const emailQuery = userEmail ? `?email=${encodeURIComponent(userEmail)}` : '';
+      const res = await fetch(`/api/notes${emailQuery}`);
       const data = await res.json();
       const notesList = data.notes || (Array.isArray(data) ? data : []);
       setNotes(notesList);
+      if (data.userRespectedNotes && Array.isArray(data.userRespectedNotes)) {
+        setRespectedNotes(data.userRespectedNotes);
+      }
     } catch (err) {
       console.error('Błąd pobierania kartek:', err);
     } finally {
@@ -263,21 +254,111 @@ function SzkolnaPodlogaApp() {
     }
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSelectDevice = (mode: 'mobile' | 'pc') => {
+    setDeviceMode(mode);
+    setDeviceSelected(true);
+  };
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstNameInput.trim() || !lastNameInput.trim() || !classInput.trim()) {
-      alert('Wypełnij wszystkie pola profilu!');
+    setAuthError('');
+    setAuthLoading(true);
+
+    if (!emailInput.trim() || !passwordInput.trim()) {
+      setAuthError('Wpisz adres Gmail oraz hasło.');
+      setAuthLoading(false);
       return;
     }
-    const newProfile: StudentProfile = {
-      firstName: firstNameInput.trim(),
-      lastName: lastNameInput.trim(),
-      className: classInput.trim().toUpperCase(),
-      deviceMode: deviceMode
-    };
-    setProfile(newProfile);
-    localStorage.setItem('sp5_student_profile', JSON.stringify(newProfile));
-    setOnboardingOpen(false);
+
+    if (authMode === 'signup') {
+      if (!firstNameInput.trim() || !lastNameInput.trim() || !classInput.trim()) {
+        setAuthError('Wypełnij imię, nazwisko oraz klasę.');
+        setAuthLoading(false);
+        return;
+      }
+    }
+
+    try {
+      if (!supabaseClient) {
+        // Fallback to local profile if Supabase Auth is not configured
+        const newProfile: StudentProfile = {
+          firstName: authMode === 'signup' ? firstNameInput.trim() : 'Uczeń',
+          lastName: authMode === 'signup' ? lastNameInput.trim() : 'SP5',
+          className: authMode === 'signup' ? classInput.trim().toUpperCase() : '8A',
+          email: emailInput.trim(),
+          deviceMode: deviceMode
+        };
+        setProfile(newProfile);
+        localStorage.setItem('sp5_student_profile', JSON.stringify(newProfile));
+        setOnboardingOpen(false);
+        fetchNotes(newProfile.email);
+        setAuthLoading(false);
+        return;
+      }
+
+      if (authMode === 'signup') {
+        const { data, error } = await supabaseClient.auth.signUp({
+          email: emailInput.trim(),
+          password: passwordInput,
+          options: {
+            data: {
+              first_name: firstNameInput.trim(),
+              last_name: lastNameInput.trim(),
+              class_name: classInput.trim().toUpperCase()
+            }
+          }
+        });
+
+        if (error) {
+          setAuthError(error.message);
+          setAuthLoading(false);
+          return;
+        }
+
+        const user = data.user;
+        const meta = user?.user_metadata || {};
+        const newProfile: StudentProfile = {
+          firstName: meta.first_name || firstNameInput.trim(),
+          lastName: meta.last_name || lastNameInput.trim(),
+          className: meta.class_name || classInput.trim().toUpperCase(),
+          email: emailInput.trim(),
+          deviceMode: deviceMode
+        };
+        setProfile(newProfile);
+        localStorage.setItem('sp5_student_profile', JSON.stringify(newProfile));
+        setOnboardingOpen(false);
+        fetchNotes(newProfile.email);
+      } else {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+          email: emailInput.trim(),
+          password: passwordInput
+        });
+
+        if (error) {
+          setAuthError(error.message);
+          setAuthLoading(false);
+          return;
+        }
+
+        const user = data.user;
+        const meta = user?.user_metadata || {};
+        const newProfile: StudentProfile = {
+          firstName: meta.first_name || 'Uczeń',
+          lastName: meta.last_name || 'SP5',
+          className: meta.class_name || '8A',
+          email: emailInput.trim(),
+          deviceMode: deviceMode
+        };
+        setProfile(newProfile);
+        localStorage.setItem('sp5_student_profile', JSON.stringify(newProfile));
+        setOnboardingOpen(false);
+        fetchNotes(newProfile.email);
+      }
+    } catch (err: any) {
+      setAuthError('Błąd uwierzytelniania: ' + (err.message || err));
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleOpenAddModal = () => {
@@ -312,7 +393,8 @@ function SzkolnaPodlogaApp() {
           last_name: profile.lastName,
           class_name: profile.className,
           message: messageInput.trim(),
-          paper_style: selectedPaperStyle
+          paper_style: selectedPaperStyle,
+          user_email: profile.email
         })
       });
 
@@ -321,7 +403,7 @@ function SzkolnaPodlogaApp() {
       if (res.ok && data.success) {
         setFormSuccess('Kartka została pomyślnie rzucona na szkolną podłogę! 🎉');
         setMessageInput('');
-        await fetchNotes();
+        await fetchNotes(profile.email);
         setTimeout(() => {
           setAddModalOpen(false);
         }, 1000);
@@ -343,10 +425,7 @@ function SzkolnaPodlogaApp() {
       ? respectedNotes.filter(item => item !== id)
       : [...respectedNotes, id];
 
-    if (!isCreator) {
-      setRespectedNotes(updatedRespected);
-      localStorage.setItem('sp5_respected_notes', JSON.stringify(updatedRespected));
-    }
+    setRespectedNotes(updatedRespected);
 
     const delta = isAlreadyRespected ? -1 : 1;
 
@@ -360,10 +439,11 @@ function SzkolnaPodlogaApp() {
 
     try {
       const actionType = isAlreadyRespected ? 'unrespect' : 'respect';
+      const userEmail = profile?.email || null;
       const res = await fetch('/api/notes', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: actionType })
+        body: JSON.stringify({ id, action: actionType, user_email: userEmail })
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -377,7 +457,7 @@ function SzkolnaPodlogaApp() {
     } catch (err) {
       console.error('Błąd zmiany szacunku:', err);
     }
-  }, [isCreator, respectedNotes, activeCard]);
+  }, [profile, respectedNotes, activeCard]);
 
   const handleDeleteNote = useCallback(async (id: string) => {
     if (!confirm('Czy na pewno chcesz usunąć tę kartkę (uprawnienia Twórcy)?')) return;
@@ -411,7 +491,7 @@ function SzkolnaPodlogaApp() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        fetchNotes();
+        fetchNotes(profile?.email);
         setActiveCard(null);
       } else {
         alert(data.error || 'Nie udało się zmienić stylu na złoty.');
@@ -419,7 +499,7 @@ function SzkolnaPodlogaApp() {
     } catch (err) {
       alert('Błąd połączenia.');
     }
-  }, []);
+  }, [profile]);
 
   const handleShare = () => {
     const url = window.location.href;
@@ -531,8 +611,8 @@ function SzkolnaPodlogaApp() {
                         <span className="sp5-ranking-place">
                           {medals[idx] || `${idx + 1}.`} <strong>Klasa {item.className}</strong>
                         </span>
-                        <span className="sp5-ranking-score">
-                          — {item.score} pkt <span className="sp5-ranking-details">({item.notesCount} kartek, 🔥 {item.respectSum})</span>
+                        <span className="sp5-ranking-score" style={{ fontWeight: 700, color: '#fde047' }}>
+                          — {item.score} pkt <span className="sp5-ranking-details" style={{ fontWeight: 400, color: '#a7f3d0' }}>({item.notesCount} kartek, 🔥 {item.respectSum})</span>
                         </span>
                       </div>
                       <div className="sp5-ranking-bar-bg">
@@ -568,6 +648,9 @@ function SzkolnaPodlogaApp() {
                     setFirstNameInput(profile.firstName);
                     setLastNameInput(profile.lastName);
                     setClassInput(profile.className);
+                    setEmailInput(profile.email || '');
+                    setPasswordInput('');
+                    setAuthMode('signin');
                     setDeviceSelected(true);
                     setOnboardingOpen(true);
                   }}
@@ -693,7 +776,7 @@ function SzkolnaPodlogaApp() {
         </button>
       </div>
 
-      {/* Onboarding / Profile Modal */}
+      {/* Onboarding / Profile & Gmail Auth Modal */}
       {onboardingOpen && (
         <div className="sp5-modal-backdrop">
           <div className="sp5-modal-content onboarding">
@@ -724,52 +807,100 @@ function SzkolnaPodlogaApp() {
               </>
             ) : (
               <>
-                <h2 className="sp5-modal-title">Kim jesteś, Uczniu SP5?</h2>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+                  <button
+                    type="button"
+                    style={{ flex: 1, background: authMode === 'signin' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
+                    onClick={() => setAuthMode('signin')}
+                  >
+                    Zaloguj się
+                  </button>
+                  <button
+                    type="button"
+                    style={{ flex: 1, background: authMode === 'signup' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
+                    onClick={() => setAuthMode('signup')}
+                  >
+                    Załóż konto (Gmail)
+                  </button>
+                </div>
+
+                <h2 className="sp5-modal-title">{authMode === 'signin' ? 'Logowanie do SP5' : 'Rejestracja w SP5'}</h2>
                 <p className="sp5-modal-subtitle">
-                  Wpisz swoje dane, aby wejść na szkolną podłogę. (Wpisz „Tymon Wierzbowski”, aby aktywować tryb Twórcy).
+                  {authMode === 'signin' ? 'Podaj swój adres Gmail i hasło, aby wejść na podłogę.' : 'Załóż konto za pomocą adresu Gmail, podając imię, nazwisko i klasę.'}
                 </p>
 
-                <form onSubmit={handleSaveProfile}>
+                {authError && <div className="sp5-error-msg">{authError}</div>}
+
+                <form onSubmit={handleAuthSubmit}>
                   <div className="sp5-form-group">
-                    <label className="sp5-form-label">Imię</label>
+                    <label className="sp5-form-label">Adres Gmail</label>
                     <input
-                      type="text"
+                      type="email"
                       className="sp5-form-input"
-                      placeholder="np. Tomek"
-                      value={firstNameInput}
-                      onChange={e => setFirstNameInput(e.target.value)}
+                      placeholder="np. jan.kowalski@gmail.com"
+                      value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
                       required
                     />
                   </div>
 
                   <div className="sp5-form-group">
-                    <label className="sp5-form-label">Nazwisko</label>
+                    <label className="sp5-form-label">Hasło (min. 6 znaków)</label>
                     <input
-                      type="text"
+                      type="password"
                       className="sp5-form-input"
-                      placeholder="np. Kowalski"
-                      value={lastNameInput}
-                      onChange={e => setLastNameInput(e.target.value)}
+                      placeholder="••••••••"
+                      value={passwordInput}
+                      onChange={e => setPasswordInput(e.target.value)}
+                      minLength={6}
                       required
                     />
                   </div>
 
-                  <div className="sp5-form-group">
-                    <label className="sp5-form-label">Wybierz klasę</label>
-                    <select
-                      className="sp5-form-input"
-                      value={classInput}
-                      onChange={e => setClassInput(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Wybierz klasę SP5 --</option>
-                      {sp5Classes.map(cls => (
-                        <option key={cls} value={cls}>
-                          Klasa {cls}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {authMode === 'signup' && (
+                    <>
+                      <div className="sp5-form-group">
+                        <label className="sp5-form-label">Imię</label>
+                        <input
+                          type="text"
+                          className="sp5-form-input"
+                          placeholder="np. Tomek"
+                          value={firstNameInput}
+                          onChange={e => setFirstNameInput(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="sp5-form-group">
+                        <label className="sp5-form-label">Nazwisko</label>
+                        <input
+                          type="text"
+                          className="sp5-form-input"
+                          placeholder="np. Kowalski"
+                          value={lastNameInput}
+                          onChange={e => setLastNameInput(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="sp5-form-group">
+                        <label className="sp5-form-label">Wybierz klasę</label>
+                        <select
+                          className="sp5-form-input"
+                          value={classInput}
+                          onChange={e => setClassInput(e.target.value)}
+                          required
+                        >
+                          <option value="">-- Wybierz klasę SP5 --</option>
+                          {sp5Classes.map(cls => (
+                            <option key={cls} value={cls}>
+                              Klasa {cls}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
 
                   <div className="sp5-modal-actions">
                     <button
@@ -779,8 +910,8 @@ function SzkolnaPodlogaApp() {
                     >
                       Wstecz
                     </button>
-                    <button type="submit" className="sp5-btn-primary">
-                      Wejdź na podłogę
+                    <button type="submit" className="sp5-btn-primary" disabled={authLoading}>
+                      {authLoading ? 'Logowanie...' : (authMode === 'signin' ? 'Zaloguj się' : 'Załóż konto')}
                     </button>
                   </div>
                 </form>

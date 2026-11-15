@@ -8,9 +8,17 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || 'sp5admin2026';
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 let inMemoryNotes: any[] = [];
+let inMemoryRespects: { user_email: string; note_id: string }[] = [];
 
-const profanityList = ['kurw', 'chuj', 'pizd', 'jeb', 'huj', 'cip', 'pedal', 'skurw', 'pierd', 'fujara', 'kretyn', 'debil'];
+const profanityList = [
+  // Polish
+  'kurw', 'chuj', 'pizd', 'jeb', 'huj', 'cip', 'pedal', 'skurw', 'pierd', 'fujara', 'kretyn', 'debil', 'idiot', 'suka', 'dziwka', 'szmata', 'pierdol', 'cipa', 'pizda', 'skurwysyn', 'frajer', 'ścierwo', 'chuj', 'huj',
+  // English
+  'fuck', 'shit', 'bitch', 'cunt', 'dick', 'cock', 'asshole', 'bastard', 'piss', 'slut', 'whore', 'retard', 'nigga', 'nigger', 'fag', 'faggot'
+];
+
 function containsProfanity(text: string): boolean {
+  if (!text) return false;
   const lower = text.toLowerCase();
   return profanityList.some(word => lower.includes(word));
 }
@@ -42,31 +50,50 @@ function isValidSp5Class(className: string): boolean {
 
 export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const email = url.searchParams.get('email');
+
     if (!supabase) {
       const safeNotes = inMemoryNotes.map(({ ip_address, ...rest }) => rest);
-      return NextResponse.json({ notes: safeNotes, source: 'memory' });
+      let userRespectedNotes: string[] = [];
+      if (email) {
+        userRespectedNotes = inMemoryRespects
+          .filter(r => r.user_email === email)
+          .map(r => r.note_id);
+      }
+      return NextResponse.json({ notes: safeNotes, userRespectedNotes, source: 'memory' });
     }
 
     const { data, error } = await supabase
       .from('sp5_notes')
-      .select('id, first_name, last_name, class_name, year_written, message, paper_style, rotation, respect_count, created_at')
+      .select('id, first_name, last_name, class_name, year_written, message, paper_style, rotation, respect_count, created_at, user_email')
       .order('created_at', { ascending: false });
 
     if (error) {
       return NextResponse.json({ notes: [], error: error.message }, { status: 500 });
     }
 
-    const safeData = data || [];
-    return NextResponse.json({ notes: safeData, source: 'supabase' });
+    let userRespectedNotes: string[] = [];
+    if (email) {
+      const { data: respectsData } = await supabase
+        .from('sp5_respects')
+        .select('note_id')
+        .eq('user_email', email);
+      if (respectsData) {
+        userRespectedNotes = respectsData.map(r => r.note_id);
+      }
+    }
+
+    return NextResponse.json({ notes: data || [], userRespectedNotes, source: 'supabase' });
   } catch (err: any) {
-    return NextResponse.json({ notes: [], source: 'error-fallback', error: err.message });
+    return NextResponse.json({ notes: [], userRespectedNotes: [], source: 'error-fallback', error: err.message });
   }
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { first_name, last_name, class_name, message, paper_style, is_creator } = body;
+    const { first_name, last_name, class_name, message, paper_style, is_creator, user_email } = body;
 
     if (!first_name || !last_name || !class_name || !message) {
       return NextResponse.json({ error: 'Wszystkie pola (imię, nazwisko, klasa, wiadomość) są wymagane.' }, { status: 400 });
@@ -81,7 +108,7 @@ export async function POST(req: Request) {
     }
 
     if (containsProfanity(message) || containsProfanity(first_name) || containsProfanity(last_name) || containsProfanity(class_name)) {
-      return NextResponse.json({ error: 'Wykryto niedozwolone słowa. Szanujmy się w szkolnej społeczności SP5!' }, { status: 400 });
+      return NextResponse.json({ error: 'Kartka zawiera niedozwolone słownictwo!' }, { status: 400 });
     }
 
     const ip_address = getClientIp(req);
@@ -97,9 +124,15 @@ export async function POST(req: Request) {
 
     if (!supabase) {
       if (!checkIsCreator) {
-        const existing = inMemoryNotes.find(n => n.ip_address === ip_address);
-        if (existing) {
-          return NextResponse.json({ error: 'Już rzuciłeś swoją kartkę na podłogę! Każdy uczeń ma tylko jedną.' }, { status: 429 });
+        if (user_email) {
+          const existingEmail = inMemoryNotes.find(n => n.user_email === user_email);
+          if (existingEmail) {
+            return NextResponse.json({ error: 'Już rzuciłeś swoją kartkę na podłogę z tego konta Gmail! Każdy uczeń może mieć tylko jedną kartkę.' }, { status: 429 });
+          }
+        }
+        const existingIp = inMemoryNotes.find(n => n.ip_address === ip_address);
+        if (existingIp) {
+          return NextResponse.json({ error: 'Już rzuciłeś swoją kartkę na podłogę! Każdy uczeń może mieć tylko jedną.' }, { status: 429 });
         }
       }
 
@@ -113,6 +146,7 @@ export async function POST(req: Request) {
         paper_style: style,
         rotation,
         ip_address,
+        user_email: user_email ? user_email.trim() : null,
         respect_count: 0,
         created_at: new Date().toISOString()
       };
@@ -127,13 +161,24 @@ export async function POST(req: Request) {
     }
 
     if (!checkIsCreator) {
-      const { data: existingNotes } = await supabase
+      if (user_email) {
+        const { data: existingEmailNotes } = await supabase
+          .from('sp5_notes')
+          .select('id')
+          .eq('user_email', user_email.trim());
+
+        if (existingEmailNotes && existingEmailNotes.length > 0) {
+          return NextResponse.json({ error: 'Już rzuciłeś swoją kartkę na podłogę z tego konta Gmail! Każdy uczeń może mieć tylko jedną kartkę.' }, { status: 429 });
+        }
+      }
+
+      const { data: existingIpNotes } = await supabase
         .from('sp5_notes')
         .select('id')
         .eq('ip_address', ip_address);
 
-      if (existingNotes && existingNotes.length > 0) {
-        return NextResponse.json({ error: 'Już rzuciłeś swoją kartkę na podłogę! Każdy uczeń ma tylko jedną.' }, { status: 429 });
+      if (existingIpNotes && existingIpNotes.length > 0) {
+        return NextResponse.json({ error: 'Już rzuciłeś swoją kartkę na podłogę! Każdy uczeń może mieć tylko jedną.' }, { status: 429 });
       }
     }
 
@@ -146,13 +191,14 @@ export async function POST(req: Request) {
       paper_style: style,
       rotation,
       ip_address,
+      user_email: user_email ? user_email.trim() : null,
       respect_count: 0
     };
 
     const { data, error } = await supabase
       .from('sp5_notes')
       .insert([insertPayload])
-      .select('id, first_name, last_name, class_name, year_written, message, paper_style, rotation, respect_count, created_at')
+      .select('id, first_name, last_name, class_name, year_written, message, paper_style, rotation, respect_count, created_at, user_email')
       .single();
 
     if (error) {
@@ -180,6 +226,7 @@ export async function DELETE(req: Request) {
 
     if (!supabase) {
       inMemoryNotes = inMemoryNotes.filter(n => n.id !== id);
+      inMemoryRespects = inMemoryRespects.filter(r => r.note_id !== id);
       return NextResponse.json({ success: true });
     }
 
@@ -201,7 +248,7 @@ export async function DELETE(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, action } = body;
+    const { id, action, user_email } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Brak ID kartki.' }, { status: 400 });
@@ -209,13 +256,41 @@ export async function PATCH(req: Request) {
 
     if (action === 'respect' || action === 'unrespect') {
       const delta = action === 'respect' ? 1 : -1;
+
       if (!supabase) {
         const note = inMemoryNotes.find(n => n.id === id);
-        if (note) {
-          note.respect_count = Math.max(0, (note.respect_count || 0) + delta);
-          return NextResponse.json({ success: true, respect_count: note.respect_count });
+        if (!note) {
+          return NextResponse.json({ error: 'Nie znaleziono kartki.' }, { status: 404 });
         }
-        return NextResponse.json({ error: 'Nie znaleziono kartki.' }, { status: 404 });
+
+        if (user_email) {
+          if (action === 'respect') {
+            const already = inMemoryRespects.some(r => r.user_email === user_email && r.note_id === id);
+            if (!already) {
+              inMemoryRespects.push({ user_email, note_id: id });
+              note.respect_count = (note.respect_count || 0) + 1;
+            }
+          } else {
+            const idx = inMemoryRespects.findIndex(r => r.user_email === user_email && r.note_id === id);
+            if (idx !== -1) {
+              inMemoryRespects.splice(idx, 1);
+              note.respect_count = Math.max(0, (note.respect_count || 0) - 1);
+            }
+          }
+        } else {
+          note.respect_count = Math.max(0, (note.respect_count || 0) + delta);
+        }
+
+        return NextResponse.json({ success: true, respect_count: note.respect_count });
+      }
+
+      // Supabase database respect tracking
+      if (user_email) {
+        if (action === 'respect') {
+          await supabase.from('sp5_respects').insert([{ user_email: user_email.trim(), note_id: id }]).select();
+        } else {
+          await supabase.from('sp5_respects').delete().eq('user_email', user_email.trim()).eq('note_id', id);
+        }
       }
 
       const { data: current, error: fetchErr } = await supabase
@@ -228,7 +303,19 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: 'Nie znaleziono kartki.' }, { status: 404 });
       }
 
-      const newCount = Math.max(0, (current.respect_count || 0) + delta);
+      // Recalculate true respect count from sp5_respects if user_email is present, otherwise apply delta
+      let newCount = (current.respect_count || 0) + delta;
+      if (user_email) {
+        const { count, error: countErr } = await supabase
+          .from('sp5_respects')
+          .select('*', { count: 'exact', head: true })
+          .eq('note_id', id);
+        if (!countErr && count !== null) {
+          newCount = count;
+        }
+      }
+      newCount = Math.max(0, newCount);
+
       const { error: updateErr } = await supabase
         .from('sp5_notes')
         .update({ respect_count: newCount })
