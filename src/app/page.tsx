@@ -178,7 +178,8 @@ function SzkolnaPodlogaApp() {
   const urlAdmin = searchParams.get('admin') === 'sp5admin2026';
 
   const [profile, setProfile] = useState<StudentProfile | null>(null);
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(true);
+  const [deviceSelected, setDeviceSelected] = useState(false);
   const [firstNameInput, setFirstNameInput] = useState('');
   const [lastNameInput, setLastNameInput] = useState('');
   const [classInput, setClassInput] = useState('8A');
@@ -210,24 +211,19 @@ function SzkolnaPodlogaApp() {
       profile.lastName.trim().toLowerCase() === 'wierzbowski');
 
   useEffect(() => {
-    const autoMode = window.innerWidth < 900 ? 'mobile' : 'pc';
-    setDeviceMode(autoMode);
-    setDeviceModeInput(autoMode);
-
     const saved = localStorage.getItem('sp5_student_profile');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         setProfile(parsed);
+        if (parsed.firstName) setFirstNameInput(parsed.firstName);
+        if (parsed.lastName) setLastNameInput(parsed.lastName);
+        if (parsed.className) setClassInput(parsed.className);
         if (parsed.deviceMode) {
           setDeviceMode(parsed.deviceMode);
           setDeviceModeInput(parsed.deviceMode);
         }
-      } catch (e) {
-        setOnboardingOpen(true);
-      }
-    } else {
-      setOnboardingOpen(true);
+      } catch (e) {}
     }
 
     const savedRespected = localStorage.getItem('sp5_respected_notes');
@@ -239,6 +235,27 @@ function SzkolnaPodlogaApp() {
 
     fetchNotes();
   }, []);
+
+  const handleSelectDevice = (mode: 'mobile' | 'pc') => {
+    setDeviceModeInput(mode);
+    setDeviceMode(mode);
+    setDeviceSelected(true);
+
+    const saved = localStorage.getItem('sp5_student_profile');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.firstName && parsed.lastName && parsed.className) {
+          const updated: StudentProfile = { ...parsed, deviceMode: mode };
+          setProfile(updated);
+          localStorage.setItem('sp5_student_profile', JSON.stringify(updated));
+          setOnboardingOpen(false);
+          return;
+        }
+      } catch (e) {}
+    }
+    // If no complete profile yet, stay open to collect name/class
+  };
 
   const fetchNotes = async () => {
     try {
@@ -273,6 +290,7 @@ function SzkolnaPodlogaApp() {
 
   const handleOpenAddModal = () => {
     if (!profile) {
+      setDeviceSelected(false);
       setOnboardingOpen(true);
       return;
     }
@@ -536,6 +554,11 @@ function SzkolnaPodlogaApp() {
 
       {/* Header & Controls */}
       <header className="sp5-header">
+        <img
+          src="/sp5-bg.jpg"
+          alt="Budynek Szkoły Podstawowej nr 5 w Piastowie"
+          className="sp5-school-postcard"
+        />
         <div className="sp5-header-top">
           <div className="sp5-title-area">
             <h1>🏫 SZKOLNA PODŁOGA SP5 PIASTÓW</h1>
@@ -556,6 +579,7 @@ function SzkolnaPodlogaApp() {
                     setLastNameInput(profile.lastName);
                     setClassInput(profile.className);
                     setDeviceModeInput(deviceMode);
+                    setDeviceSelected(false);
                     setOnboardingOpen(true);
                   }}
                 >
@@ -699,82 +723,95 @@ function SzkolnaPodlogaApp() {
       {onboardingOpen && (
         <div className="sp5-modal-backdrop">
           <div className="sp5-modal-content onboarding">
-            <h2 className="sp5-modal-title">Kim jesteś, Uczniu SP5?</h2>
-            <p className="sp5-modal-subtitle">
-              Wpisz swoje dane i wybierz wersję urządzenia, aby wejść na szkolną podłogę. (Wpisz
-              „Tymon Wierzbowski”, aby aktywować tryb Twórcy).
-            </p>
-
-            <form onSubmit={handleSaveProfile}>
-              <div className="sp5-form-group">
-                <label className="sp5-form-label">Imię</label>
-                <input
-                  type="text"
-                  className="sp5-form-input"
-                  placeholder="np. Tomek"
-                  value={firstNameInput}
-                  onChange={e => setFirstNameInput(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="sp5-form-group">
-                <label className="sp5-form-label">Nazwisko</label>
-                <input
-                  type="text"
-                  className="sp5-form-input"
-                  placeholder="np. Kowalski"
-                  value={lastNameInput}
-                  onChange={e => setLastNameInput(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="sp5-form-group">
-                <label className="sp5-form-label">Wybierz klasę</label>
-                <select
-                  className="sp5-form-input"
-                  value={classInput}
-                  onChange={e => setClassInput(e.target.value)}
-                  required
-                >
-                  <option value="">-- Wybierz klasę SP5 --</option>
-                  {sp5Classes.map(cls => (
-                    <option key={cls} value={cls}>
-                      Klasa {cls}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sp5-form-group">
-                <label className="sp5-form-label">Wybierz wersję urządzenia</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
+            {!deviceSelected ? (
+              <>
+                <h2 className="sp5-modal-title">Wybierz wersję urządzenia</h2>
+                <p className="sp5-modal-subtitle">
+                  Wybierz, z jakiego urządzenia korzystasz, aby optymalnie dopasować widok Szkolnej Podłogi SP5.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '20px' }}>
                   <button
                     type="button"
-                    className={`sp5-paper-option ${deviceModeInput === 'mobile' ? 'selected' : ''}`}
-                    style={{ flex: 1, textAlign: 'center', padding: '10px', background: deviceModeInput === 'mobile' ? '#2563eb' : '#27272a', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
-                    onClick={() => setDeviceModeInput('mobile')}
+                    className="sp5-btn-primary"
+                    style={{ padding: '16px', fontSize: '1.05rem', background: '#1B3B2B', border: '2px solid #8B5A2B' }}
+                    onClick={() => handleSelectDevice('mobile')}
                   >
-                    📱 Jestem na Telefonie
+                    📱 Jestem na Telefonie (Wersja Mobilna)
                   </button>
                   <button
                     type="button"
-                    className={`sp5-paper-option ${deviceModeInput === 'pc' ? 'selected' : ''}`}
-                    style={{ flex: 1, textAlign: 'center', padding: '10px', background: deviceModeInput === 'pc' ? '#2563eb' : '#27272a', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
-                    onClick={() => setDeviceModeInput('pc')}
+                    className="sp5-btn-primary"
+                    style={{ padding: '16px', fontSize: '1.05rem', background: '#2563eb' }}
+                    onClick={() => handleSelectDevice('pc')}
                   >
                     💻 Jestem na Komputerze (PC)
                   </button>
                 </div>
-              </div>
+              </>
+            ) : (
+              <>
+                <h2 className="sp5-modal-title">Kim jesteś, Uczniu SP5?</h2>
+                <p className="sp5-modal-subtitle">
+                  Wpisz swoje dane, aby wejść na szkolną podłogę. (Wpisz „Tymon Wierzbowski”, aby aktywować tryb Twórcy).
+                </p>
 
-              <div className="sp5-modal-actions">
-                <button type="submit" className="sp5-btn-primary">
-                  Wejdź na podłogę
-                </button>
-              </div>
-            </form>
+                <form onSubmit={handleSaveProfile}>
+                  <div className="sp5-form-group">
+                    <label className="sp5-form-label">Imię</label>
+                    <input
+                      type="text"
+                      className="sp5-form-input"
+                      placeholder="np. Tomek"
+                      value={firstNameInput}
+                      onChange={e => setFirstNameInput(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="sp5-form-group">
+                    <label className="sp5-form-label">Nazwisko</label>
+                    <input
+                      type="text"
+                      className="sp5-form-input"
+                      placeholder="np. Kowalski"
+                      value={lastNameInput}
+                      onChange={e => setLastNameInput(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="sp5-form-group">
+                    <label className="sp5-form-label">Wybierz klasę</label>
+                    <select
+                      className="sp5-form-input"
+                      value={classInput}
+                      onChange={e => setClassInput(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Wybierz klasę SP5 --</option>
+                      {sp5Classes.map(cls => (
+                        <option key={cls} value={cls}>
+                          Klasa {cls}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="sp5-modal-actions">
+                    <button
+                      type="button"
+                      className="sp5-btn-secondary"
+                      onClick={() => setDeviceSelected(false)}
+                    >
+                      Wstecz
+                    </button>
+                    <button type="submit" className="sp5-btn-primary">
+                      Wejdź na podłogę
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}
