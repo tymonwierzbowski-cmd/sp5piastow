@@ -554,11 +554,6 @@ function SzkolnaPodlogaApp() {
 
       {/* Header & Controls */}
       <header className="sp5-header">
-        <img
-          src="/sp5-bg.jpg"
-          alt="Budynek Szkoły Podstawowej nr 5 w Piastowie"
-          className="sp5-school-postcard"
-        />
         <div className="sp5-header-top">
           <div className="sp5-title-area">
             <h1>🏫 SZKOLNA PODŁOGA SP5 PIASTÓW</h1>

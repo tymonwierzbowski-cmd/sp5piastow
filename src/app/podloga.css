@@ -19,12 +19,11 @@
 }
 
 html, body, .sp5-container {
-  background-color: #1a1614;
-  background-image: 
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.04) 0%, transparent 80%),
-    linear-gradient(135deg, #221c18 25%, #181412 25%, #181412 50%, #221c18 50%, #221c18 75%, #181412 75%, #181412 100%);
-  background-size: 100% 100%, 32px 32px;
+  background-image: linear-gradient(to bottom, rgba(12, 16, 20, 0.50), rgba(12, 16, 20, 0.80)), url('/sp5-bg.jpg');
+  background-size: cover;
+  background-position: center center;
   background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 html, body {
@@ -230,18 +229,6 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.sp5-school-postcard {
-  max-width: 679px;
-  width: 100%;
-  height: auto;
-  border: 4px solid #8B5A2B;
-  border-radius: 8px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
-  margin: 0 auto 16px auto;
-  display: block;
-  image-rendering: -webkit-optimize-contrast;
 }
 
 .sp5-header-top {
