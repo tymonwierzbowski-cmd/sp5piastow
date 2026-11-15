@@ -184,7 +184,6 @@ function SzkolnaPodlogaApp() {
   const [lastNameInput, setLastNameInput] = useState('');
   const [classInput, setClassInput] = useState('8A');
   const [deviceMode, setDeviceMode] = useState<'mobile' | 'pc'>('pc');
-  const [deviceModeInput, setDeviceModeInput] = useState<'mobile' | 'pc'>('pc');
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -211,6 +210,10 @@ function SzkolnaPodlogaApp() {
       profile.lastName.trim().toLowerCase() === 'wierzbowski');
 
   useEffect(() => {
+    // Always start with deviceSelected = false on every load/refresh
+    setDeviceSelected(false);
+    setOnboardingOpen(true);
+
     const saved = localStorage.getItem('sp5_student_profile');
     if (saved) {
       try {
@@ -219,10 +222,7 @@ function SzkolnaPodlogaApp() {
         if (parsed.firstName) setFirstNameInput(parsed.firstName);
         if (parsed.lastName) setLastNameInput(parsed.lastName);
         if (parsed.className) setClassInput(parsed.className);
-        if (parsed.deviceMode) {
-          setDeviceMode(parsed.deviceMode);
-          setDeviceModeInput(parsed.deviceMode);
-        }
+        if (parsed.deviceMode) setDeviceMode(parsed.deviceMode);
       } catch (e) {}
     }
 
@@ -237,24 +237,17 @@ function SzkolnaPodlogaApp() {
   }, []);
 
   const handleSelectDevice = (mode: 'mobile' | 'pc') => {
-    setDeviceModeInput(mode);
     setDeviceMode(mode);
     setDeviceSelected(true);
 
-    const saved = localStorage.getItem('sp5_student_profile');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.firstName && parsed.lastName && parsed.className) {
-          const updated: StudentProfile = { ...parsed, deviceMode: mode };
-          setProfile(updated);
-          localStorage.setItem('sp5_student_profile', JSON.stringify(updated));
-          setOnboardingOpen(false);
-          return;
-        }
-      } catch (e) {}
+    if (profile && profile.firstName && profile.lastName && profile.className) {
+      const updated: StudentProfile = { ...profile, deviceMode: mode };
+      setProfile(updated);
+      localStorage.setItem('sp5_student_profile', JSON.stringify(updated));
+      setOnboardingOpen(false);
+    } else {
+      // Keep onboarding open to collect name/class
     }
-    // If no complete profile yet, stay open to collect name/class
   };
 
   const fetchNotes = async () => {
@@ -280,10 +273,9 @@ function SzkolnaPodlogaApp() {
       firstName: firstNameInput.trim(),
       lastName: lastNameInput.trim(),
       className: classInput.trim().toUpperCase(),
-      deviceMode: deviceModeInput
+      deviceMode: deviceMode
     };
     setProfile(newProfile);
-    setDeviceMode(deviceModeInput);
     localStorage.setItem('sp5_student_profile', JSON.stringify(newProfile));
     setOnboardingOpen(false);
   };
@@ -573,27 +565,11 @@ function SzkolnaPodlogaApp() {
                     setFirstNameInput(profile.firstName);
                     setLastNameInput(profile.lastName);
                     setClassInput(profile.className);
-                    setDeviceModeInput(deviceMode);
-                    setDeviceSelected(false);
+                    setDeviceSelected(true);
                     setOnboardingOpen(true);
                   }}
                 >
                   Zmień dane
-                </button>
-                <button
-                  className="sp5-change-btn mode-toggle-btn"
-                  onClick={() => {
-                    const nextMode = deviceMode === 'mobile' ? 'pc' : 'mobile';
-                    setDeviceMode(nextMode);
-                    if (profile) {
-                      const updated: StudentProfile = { ...profile, deviceMode: nextMode };
-                      setProfile(updated);
-                      localStorage.setItem('sp5_student_profile', JSON.stringify(updated));
-                    }
-                  }}
-                  title="Przełącz tryb urządzenia (Telefon / PC)"
-                >
-                  {deviceMode === 'mobile' ? '💻 Przełącz na PC' : '📱 Przełącz na Telefon'}
                 </button>
               </div>
             )}
@@ -682,7 +658,7 @@ function SzkolnaPodlogaApp() {
           <div className="empty-state chalkboard-empty">
             <div className="chalkboard-message-box">
               <h3>Podłoga jest jeszcze czysta!</h3>
-              <p>Bądź pierwszą osobą z SP5 Piastów, która rzuci tu swoją kartkę za pomocą złotego przycisku na dole ekranu.</p>
+              <p>Bądź pierwszą osobą z SP5 Piastów, która rzuci tu swoją kartkę.</p>
             </div>
           </div>
         ) : (
@@ -731,7 +707,7 @@ function SzkolnaPodlogaApp() {
                     style={{ padding: '16px', fontSize: '1.05rem', background: '#1B3B2B', border: '2px solid #8B5A2B' }}
                     onClick={() => handleSelectDevice('mobile')}
                   >
-                    📱 Jestem na Telefonie (Wersja Mobilna)
+                    📱 Jestem na Telefonie
                   </button>
                   <button
                     type="button"
