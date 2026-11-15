@@ -487,7 +487,7 @@ function SzkolnaPodlogaApp() {
           <div className="sp5-ranking-list">
             {rankedClasses.length === 0 ? (
               <p style={{ textAlign: 'center', color: '#a7f3d0', fontSize: '0.85rem' }}>
-                Brak punktów — rzuć kartkę, aby Twoja klasa objęła prowadzenie!
+                Brak punktów — rzuć kartkę jako pierwszy!
               </p>
             ) : (
               rankedClasses.map((item, idx) => {
@@ -628,9 +628,6 @@ function SzkolnaPodlogaApp() {
             <div className="chalkboard-message-box">
               <h3>Podłoga jest jeszcze czysta!</h3>
               <p>Bądź pierwszą osobą z SP5 Piastów, która rzuci tu swoją kartkę.</p>
-              <button className="sp5-btn-primary" onClick={handleOpenAddModal} style={{ marginTop: '16px' }}>
-                + Rzuć pierwszą kartkę
-              </button>
             </div>
           </div>
         ) : (
