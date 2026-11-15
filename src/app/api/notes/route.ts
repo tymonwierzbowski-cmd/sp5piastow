@@ -244,6 +244,14 @@ function isAdminRequest(req: Request): boolean {
   return adminKeyHeader === ADMIN_SECRET || adminKeyHeader === 'sp5admin2026';
 }
 
+function isValidSp5Class(className: string): boolean {
+  if (!className) return false;
+  const clean = className.trim().toUpperCase();
+  if (clean === 'ABSOLWENT SP5' || clean === 'ABSOLWENT') return true;
+  const match = clean.match(/^([1-8])([A-D])$/);
+  return match !== null;
+}
+
 export async function GET(req: Request) {
   try {
     if (!supabase) {
@@ -272,6 +280,10 @@ export async function POST(req: Request) {
 
     if (!first_name || !last_name || !class_name || !message) {
       return NextResponse.json({ error: 'Wszystkie pola (imię, nazwisko, klasa, wiadomość) są wymagane.' }, { status: 400 });
+    }
+
+    if (!isValidSp5Class(class_name)) {
+      return NextResponse.json({ error: 'Nieprawidłowa klasa SP5. Wybierz klasę od 1A do 8D lub Absolwent SP5.' }, { status: 400 });
     }
 
     if (message.length > 160) {

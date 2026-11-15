@@ -106,6 +106,18 @@ const NoteCard = React.memo(({ note, isCreator, onCardClick, onRespect, onDelete
 });
 NoteCard.displayName = 'NoteCard';
 
+const sp5Classes = [
+  '1A', '1B', '1C', '1D',
+  '2A', '2B', '2C', '2D',
+  '3A', '3B', '3C', '3D',
+  '4A', '4B', '4C', '4D',
+  '5A', '5B', '5C', '5D',
+  '6A', '6B', '6C', '6D',
+  '7A', '7B', '7C', '7D',
+  '8A', '8B', '8C', '8D',
+  'Absolwent SP5'
+];
+
 function SzkolnaPodlogaApp() {
   const searchParams = useSearchParams();
   const urlAdmin = searchParams.get('admin') === 'sp5admin2026';
@@ -114,7 +126,7 @@ function SzkolnaPodlogaApp() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [firstNameInput, setFirstNameInput] = useState('');
   const [lastNameInput, setLastNameInput] = useState('');
-  const [classInput, setClassInput] = useState('');
+  const [classInput, setClassInput] = useState('8A');
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -204,9 +216,8 @@ function SzkolnaPodlogaApp() {
     try {
       const res = await fetch('/api/notes');
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setNotes(data);
-      }
+      const notesList = data.notes || (Array.isArray(data) ? data : []);
+      setNotes(notesList);
     } catch (err) {
       console.error('Błąd pobierania kartek:', err);
     } finally {
@@ -649,15 +660,20 @@ function SzkolnaPodlogaApp() {
               </div>
 
               <div className="sp5-form-group">
-                <label className="sp5-form-label">Klasa</label>
-                <input
-                  type="text"
+                <label className="sp5-form-label">Wybierz klasę</label>
+                <select
                   className="sp5-form-input"
-                  placeholder="np. 8A, 7B"
                   value={classInput}
                   onChange={e => setClassInput(e.target.value)}
                   required
-                />
+                >
+                  <option value="">-- Wybierz klasę SP5 --</option>
+                  {sp5Classes.map(cls => (
+                    <option key={cls} value={cls}>
+                      Klasa {cls}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="sp5-modal-actions">
