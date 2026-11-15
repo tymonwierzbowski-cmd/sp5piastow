@@ -105,9 +105,10 @@ interface NoteCardProps {
   onRespect: (id: string, e: React.MouseEvent) => void;
   onDelete: (id: string, e: React.MouseEvent) => void;
   onMakeGold: (id: string, e: React.MouseEvent) => void;
+  onResetRespect: (id: string, e: React.MouseEvent) => void;
 }
 
-const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onRespect, onDelete, onMakeGold }: NoteCardProps) => {
+const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onRespect, onDelete, onMakeGold, onResetRespect }: NoteCardProps) => {
   const isNoteCreator =
     note.first_name.toLowerCase() === 'tymon' &&
     note.last_name.toLowerCase() === 'wierzbowski';
@@ -129,6 +130,13 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
             onClick={(e) => onDelete(note.id, e)}
           >
             🗑️ Usuń
+          </button>
+          <button
+            className="sp5-mini-btn reset"
+            title="Wyzeruj Szacun"
+            onClick={(e) => onResetRespect(note.id, e)}
+          >
+            🔄 Wyzeruj
           </button>
           {note.paper_style !== 'gold' && (
             <button
@@ -176,6 +184,15 @@ const sp5Classes = [
   'Absolwent SP5'
 ];
 
+function translateAuthError(msg: string): string {
+  if (!msg) return 'Wystąpił błąd uwierzytelniania.';
+  if (msg.includes('Invalid login credentials')) return 'Błędny adres Gmail lub hasło!';
+  if (msg.includes('User already registered')) return 'To konto Gmail jest już zarejestrowane – przełącz na zakładkę Zaloguj się!';
+  if (msg.includes('Password should be at least 6 characters')) return 'Hasło musi mieć co najmniej 6 znaków!';
+  if (msg.includes('Email not confirmed')) return 'Adres Gmail nie został potwierdzony.';
+  return `Błąd: ${msg}`;
+}
+
 function SzkolnaPodlogaApp() {
   const searchParams = useSearchParams();
   const urlAdmin = searchParams.get('admin') === 'sp5admin2026';
@@ -183,14 +200,17 @@ function SzkolnaPodlogaApp() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(true);
   const [deviceSelected, setDeviceSelected] = useState(false);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot' | 'update_password'>('signin');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [firstNameInput, setFirstNameInput] = useState('');
   const [lastNameInput, setLastNameInput] = useState('');
   const [classInput, setClassInput] = useState('8A');
   const [deviceMode, setDeviceMode] = useState<'mobile' | 'pc'>('pc');
   const [authError, setAuthError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -204,7 +224,6 @@ function SzkolnaPodlogaApp() {
   const [selectedPaperStyle, setSelectedPaperStyle] = useState('grid');
   const [messageInput, setMessageInput] = useState('');
   const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Detail Modal
@@ -221,6 +240,20 @@ function SzkolnaPodlogaApp() {
     setDeviceSelected(false);
     setOnboardingOpen(true);
 
+    if (supabaseClient) {
+      const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setAuthMode('update_password');
+          setOnboardingOpen(true);
+        }
+      });
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, []);
+
+  useEffect(() => {
     const saved = localStorage.getItem('sp5_student_profile');
     if (saved) {
       try {
@@ -231,6 +264,13 @@ function SzkolnaPodlogaApp() {
         if (parsed.className) setClassInput(parsed.className);
         if (parsed.email) setEmailInput(parsed.email);
         if (parsed.deviceMode) setDeviceMode(parsed.deviceMode);
+      } catch (e) {}
+    }
+
+    const savedRespected = localStorage.getItem('sp5_respected_notes');
+    if (savedRespected) {
+      try {
+        setRespectedNotes(JSON.parse(savedRespected));
       } catch (e) {}
     }
 
@@ -262,9 +302,13 @@ function SzkolnaPodlogaApp() {
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
+    setFormSuccess('');
     setAuthLoading(true);
 
-    if (!emailInput.trim() || !passwordInput.trim()) {
+    const emailClean = emailInput.trim().toLowerCase();
+    const passwordClean = passwordInput.trim();
+
+    if (!emailClean || !passwordClean) {
       setAuthError('Wpisz adres Gmail oraz hasło.');
       setAuthLoading(false);
       return;
@@ -280,12 +324,11 @@ function SzkolnaPodlogaApp() {
 
     try {
       if (!supabaseClient) {
-        // Fallback to local profile if Supabase Auth is not configured
         const newProfile: StudentProfile = {
           firstName: authMode === 'signup' ? firstNameInput.trim() : 'Uczeń',
           lastName: authMode === 'signup' ? lastNameInput.trim() : 'SP5',
           className: authMode === 'signup' ? classInput.trim().toUpperCase() : '8A',
-          email: emailInput.trim(),
+          email: emailClean,
           deviceMode: deviceMode
         };
         setProfile(newProfile);
@@ -298,8 +341,8 @@ function SzkolnaPodlogaApp() {
 
       if (authMode === 'signup') {
         const { data, error } = await supabaseClient.auth.signUp({
-          email: emailInput.trim(),
-          password: passwordInput,
+          email: emailClean,
+          password: passwordClean,
           options: {
             data: {
               first_name: firstNameInput.trim(),
@@ -310,7 +353,7 @@ function SzkolnaPodlogaApp() {
         });
 
         if (error) {
-          setAuthError(error.message);
+          setAuthError(translateAuthError(error.message));
           setAuthLoading(false);
           return;
         }
@@ -321,7 +364,7 @@ function SzkolnaPodlogaApp() {
           firstName: meta.first_name || firstNameInput.trim(),
           lastName: meta.last_name || lastNameInput.trim(),
           className: meta.class_name || classInput.trim().toUpperCase(),
-          email: emailInput.trim(),
+          email: emailClean,
           deviceMode: deviceMode
         };
         setProfile(newProfile);
@@ -330,12 +373,12 @@ function SzkolnaPodlogaApp() {
         fetchNotes(newProfile.email);
       } else {
         const { data, error } = await supabaseClient.auth.signInWithPassword({
-          email: emailInput.trim(),
-          password: passwordInput
+          email: emailClean,
+          password: passwordClean
         });
 
         if (error) {
-          setAuthError(error.message);
+          setAuthError(translateAuthError(error.message));
           setAuthLoading(false);
           return;
         }
@@ -346,7 +389,7 @@ function SzkolnaPodlogaApp() {
           firstName: meta.first_name || 'Uczeń',
           lastName: meta.last_name || 'SP5',
           className: meta.class_name || '8A',
-          email: emailInput.trim(),
+          email: emailClean,
           deviceMode: deviceMode
         };
         setProfile(newProfile);
@@ -355,7 +398,66 @@ function SzkolnaPodlogaApp() {
         fetchNotes(newProfile.email);
       }
     } catch (err: any) {
-      setAuthError('Błąd uwierzytelniania: ' + (err.message || err));
+      setAuthError(translateAuthError(err.message || err));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setFormSuccess('');
+    if (!emailInput.trim()) {
+      setAuthError('Wpisz najpierw swój adres Gmail.');
+      return;
+    }
+    if (!supabaseClient) {
+      setAuthError('Supabase nie jest skonfigurowany.');
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(emailInput.trim().toLowerCase(), {
+        redirectTo: window.location.origin
+      });
+      if (error) {
+        setAuthError(translateAuthError(error.message));
+      } else {
+        setFormSuccess('Wysłaliśmy link do zmiany hasła na Twój adres Gmail!');
+      }
+    } catch (err: any) {
+      setAuthError(translateAuthError(err.message));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    if (!newPasswordInput.trim() || newPasswordInput.trim().length < 6) {
+      setAuthError('Nowe hasło musi mieć co najmniej 6 znaków.');
+      return;
+    }
+    if (!supabaseClient) {
+      setAuthError('Supabase nie jest skonfigurowany.');
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      const { error } = await supabaseClient.auth.updateUser({
+        password: newPasswordInput.trim()
+      });
+      if (error) {
+        setAuthError(translateAuthError(error.message));
+      } else {
+        alert('Hasło zostało pomyślnie zmienione! Zaloguj się nowym hasłem.');
+        setAuthMode('signin');
+        setNewPasswordInput('');
+      }
+    } catch (err: any) {
+      setAuthError(translateAuthError(err.message));
     } finally {
       setAuthLoading(false);
     }
@@ -500,6 +602,35 @@ function SzkolnaPodlogaApp() {
       alert('Błąd połączenia.');
     }
   }, [profile]);
+
+  const handleResetRespect = useCallback(async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!confirm('Czy na pewno chcesz wyzerować Szacun tej kartki (uprawnienia Twórcy)?')) return;
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'sp5admin2026'
+        },
+        body: JSON.stringify({ id, action: 'reset_respect' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNotes(prev =>
+          prev.map(n => (n.id === id ? { ...n, respect_count: 0 } : n))
+        );
+        if (activeCard && activeCard.id === id) {
+          setActiveCard(prev => (prev ? { ...prev, respect_count: 0 } : null));
+        }
+        setRespectedNotes(prev => prev.filter(item => item !== id));
+      } else {
+        alert(data.error || 'Nie udało się wyzerować szacunku.');
+      }
+    } catch (err) {
+      alert('Błąd połączenia.');
+    }
+  }, [activeCard]);
 
   const handleShare = () => {
     const url = window.location.href;
@@ -764,6 +895,10 @@ function SzkolnaPodlogaApp() {
                 e.stopPropagation();
                 handleMakeGold(id);
               }}
+              onResetRespect={(id, e) => {
+                e.stopPropagation();
+                handleResetRespect(id, e);
+              }}
             />
           ))
         )}
@@ -805,20 +940,87 @@ function SzkolnaPodlogaApp() {
                   </button>
                 </div>
               </>
+            ) : authMode === 'forgot' ? (
+              <>
+                <h2 className="sp5-modal-title">Resetowanie hasła</h2>
+                <p className="sp5-modal-subtitle">
+                  Wpisz swój adres Gmail, aby otrzymać link do zmiany hasła.
+                </p>
+
+                {authError && <div className="sp5-error-msg">{authError}</div>}
+                {formSuccess && <div className="sp5-success-msg">{formSuccess}</div>}
+
+                <form onSubmit={handleForgotPassword}>
+                  <div className="sp5-form-group">
+                    <label className="sp5-form-label">Adres Gmail</label>
+                    <input
+                      type="email"
+                      className="sp5-form-input"
+                      placeholder="np. jan.kowalski@gmail.com"
+                      value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="sp5-modal-actions">
+                    <button
+                      type="button"
+                      className="sp5-btn-secondary"
+                      onClick={() => setAuthMode('signin')}
+                    >
+                      Wróć do logowania
+                    </button>
+                    <button type="submit" className="sp5-btn-primary" disabled={authLoading}>
+                      {authLoading ? 'Wysyłanie...' : 'Wyślij link do resetu hasła'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : authMode === 'update_password' ? (
+              <>
+                <h2 className="sp5-modal-title">Ustaw nowe hasło</h2>
+                <p className="sp5-modal-subtitle">
+                  Wpisz swoje nowe hasło (minimum 6 znaków).
+                </p>
+
+                {authError && <div className="sp5-error-msg">{authError}</div>}
+
+                <form onSubmit={handleUpdatePassword}>
+                  <div className="sp5-form-group">
+                    <label className="sp5-form-label">Nowe hasło</label>
+                    <input
+                      type="password"
+                      className="sp5-form-input"
+                      placeholder="••••••••"
+                      value={newPasswordInput}
+                      onChange={e => setNewPasswordInput(e.target.value)}
+                      minLength={6}
+                      required
+                    />
+                  </div>
+
+                  <div className="sp5-modal-actions">
+                    <button type="submit" className="sp5-btn-primary" disabled={authLoading}>
+                      {authLoading ? 'Zapisywanie...' : 'Zapisz nowe hasło'}
+                    </button>
+                  </div>
+                </form>
+              </>
             ) : (
               <>
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
                   <button
                     type="button"
                     style={{ flex: 1, background: authMode === 'signin' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
-                    onClick={() => setAuthMode('signin')}
+                    onClick={() => { setAuthMode('signin'); setAuthError(''); }}
                   >
                     Zaloguj się
                   </button>
                   <button
                     type="button"
                     style={{ flex: 1, background: authMode === 'signup' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
-                    onClick={() => setAuthMode('signup')}
+                    onClick={() => { setAuthMode('signup'); setAuthError(''); }}
                   >
                     Załóż konto (Gmail)
                   </button>
@@ -830,6 +1032,7 @@ function SzkolnaPodlogaApp() {
                 </p>
 
                 {authError && <div className="sp5-error-msg">{authError}</div>}
+                {formSuccess && <div className="sp5-success-msg">{formSuccess}</div>}
 
                 <form onSubmit={handleAuthSubmit}>
                   <div className="sp5-form-group">
@@ -844,18 +1047,42 @@ function SzkolnaPodlogaApp() {
                     />
                   </div>
 
-                  <div className="sp5-form-group">
+                  <div className="sp5-form-group" style={{ position: 'relative' }}>
                     <label className="sp5-form-label">Hasło (min. 6 znaków)</label>
-                    <input
-                      type="password"
-                      className="sp5-form-input"
-                      placeholder="••••••••"
-                      value={passwordInput}
-                      onChange={e => setPasswordInput(e.target.value)}
-                      minLength={6}
-                      required
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        className="sp5-form-input"
+                        placeholder="••••••••"
+                        value={passwordInput}
+                        onChange={e => setPasswordInput(e.target.value)}
+                        minLength={6}
+                        required
+                        style={{ paddingRight: '40px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }}
+                        title={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
+                      >
+                        {showPassword ? '🙈' : '👁️'}
+                      </button>
+                    </div>
                   </div>
+
+                  {authMode === 'signin' && (
+                    <div style={{ marginBottom: '14px', textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        className="sp5-change-btn"
+                        style={{ fontSize: '0.8rem', color: '#93c5fd' }}
+                        onClick={() => { setAuthMode('forgot'); setAuthError(''); }}
+                      >
+                        Zapomniałem hasła / Zresetuj hasło
+                      </button>
+                    </div>
+                  )}
 
                   {authMode === 'signup' && (
                     <>
@@ -1036,10 +1263,17 @@ function SzkolnaPodlogaApp() {
                   >
                     🗑️ Usuń
                   </button>
+                  <button
+                    className="sp5-btn-secondary"
+                    style={{ background: '#d97706', color: '#fff' }}
+                    onClick={() => handleResetRespect(activeCard.id)}
+                  >
+                    🔄 Wyzeruj Szacun
+                  </button>
                   {activeCard.paper_style !== 'gold' && (
                     <button
                       className="sp5-btn-secondary"
-                      style={{ background: '#d97706', color: '#fff' }}
+                      style={{ background: '#eab308', color: '#000' }}
                       onClick={() => handleMakeGold(activeCard.id)}
                     >
                       👑 Zmień na Złotą

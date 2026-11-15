@@ -328,6 +328,34 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ success: true, respect_count: newCount });
     }
 
+    if (action === 'reset_respect') {
+      if (!isAdminRequest(req)) {
+        return NextResponse.json({ error: 'Brak uprawnień Twórcy Strony.' }, { status: 403 });
+      }
+
+      if (!supabase) {
+        const note = inMemoryNotes.find(n => n.id === id);
+        if (note) {
+          note.respect_count = 0;
+          inMemoryRespects = inMemoryRespects.filter(r => r.note_id !== id);
+          return NextResponse.json({ success: true, respect_count: 0 });
+        }
+        return NextResponse.json({ error: 'Nie znaleziono kartki.' }, { status: 404 });
+      }
+
+      await supabase.from('sp5_respects').delete().eq('note_id', id);
+      const { error: updateErr } = await supabase
+        .from('sp5_notes')
+        .update({ respect_count: 0 })
+        .eq('id', id);
+
+      if (updateErr) {
+        return NextResponse.json({ error: updateErr.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, respect_count: 0 });
+    }
+
     if (action === 'make_gold') {
       if (!isAdminRequest(req)) {
         return NextResponse.json({ error: 'Brak uprawnień Twórcy Strony.' }, { status: 403 });
