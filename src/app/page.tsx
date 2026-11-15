@@ -102,7 +102,7 @@ interface NoteCardProps {
   isCreator: boolean;
   isRespected: boolean;
   onCardClick: (note: Note) => void;
-  onRespect: (id: string, e: React.MouseEvent) => void;
+  onRespect: (id: string, actionType: 'respect' | 'unrespect', e: React.MouseEvent) => void;
   onDelete: (id: string, e: React.MouseEvent) => void;
   onMakeGold: (id: string, e: React.MouseEvent) => void;
   onResetRespect: (id: string, e: React.MouseEvent) => void;
@@ -156,16 +156,30 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
           {note.first_name} {note.last_name} • {note.class_name} • {note.year_written}{' '}
           {isNoteCreator && '👑'}
         </span>
-        <button
-          className={`sp5-respect-badge respect-btn ${isRespected ? 'respected' : ''}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRespect(note.id, e);
-          }}
-          title={isRespected ? 'Kliknij ponownie, aby cofnąć Szacun' : 'Kliknij, aby dać Szacun (+1)'}
-        >
-          {isRespected ? `✓ Dano Szacun (${note.respect_count})` : `👏 Szacun (${note.respect_count})`}
-        </button>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button
+            className={`sp5-respect-btn respect-action ${isRespected ? 'disabled' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isRespected) onRespect(note.id, 'respect', e);
+            }}
+            disabled={isRespected && !isCreator}
+            title={isRespected ? 'Już dałeś Szacun' : 'Daj Szacun (+1)'}
+          >
+            👏 Szacun ({note.respect_count})
+          </button>
+          <button
+            className={`sp5-respect-btn unrespect-action ${!isRespected ? 'disabled' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isRespected) onRespect(note.id, 'unrespect', e);
+            }}
+            disabled={!isRespected}
+            title={!isRespected ? 'Nie dałeś jeszcze Szacunu' : 'Cofnij Szacun (-1)'}
+          >
+            👎 Unszacun
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -241,40 +255,69 @@ function SzkolnaPodlogaApp() {
     setOnboardingOpen(true);
 
     if (supabaseClient) {
+      supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        if (session && session.user) {
+          const user = session.user;
+          const meta = user.user_metadata || {};
+          const email = user.email || '';
+          if (meta.first_name && meta.last_name && meta.className) {
+            const userProfile: StudentProfile = {
+              firstName: meta.first_name,
+              lastName: meta.last_name,
+              className: meta.class_name,
+              email: email,
+              deviceMode: deviceMode
+            };
+            setProfile(userProfile);
+            localStorage.setItem('sp5_student_profile', JSON.stringify(userProfile));
+            setOnboardingOpen(false);
+            fetchNotes(email);
+          }
+        }
+      });
+
       const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
           setAuthMode('update_password');
           setOnboardingOpen(true);
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          const user = session.user;
+          const meta = user.user_metadata || {};
+          const email = user.email || '';
+          if (meta.first_name && meta.last_name && meta.className) {
+            const userProfile: StudentProfile = {
+              firstName: meta.first_name,
+              lastName: meta.last_name,
+              className: meta.class_name,
+              email: email,
+              deviceMode: deviceMode
+            };
+            setProfile(userProfile);
+            localStorage.setItem('sp5_student_profile', JSON.stringify(userProfile));
+            setOnboardingOpen(false);
+            fetchNotes(email);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setProfile(null);
+          localStorage.removeItem('sp5_student_profile');
+          setDeviceSelected(false);
+          setOnboardingOpen(true);
         }
       });
+
       return () => {
         subscription.unsubscribe();
       };
+    } else {
+      const saved = localStorage.getItem('sp5_student_profile');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setProfile(parsed);
+          if (parsed.email) fetchNotes(parsed.email);
+        } catch (e) {}
+      }
     }
-  }, []);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('sp5_student_profile');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setProfile(parsed);
-        if (parsed.firstName) setFirstNameInput(parsed.firstName);
-        if (parsed.lastName) setLastNameInput(parsed.lastName);
-        if (parsed.className) setClassInput(parsed.className);
-        if (parsed.email) setEmailInput(parsed.email);
-        if (parsed.deviceMode) setDeviceMode(parsed.deviceMode);
-      } catch (e) {}
-    }
-
-    const savedRespected = localStorage.getItem('sp5_respected_notes');
-    if (savedRespected) {
-      try {
-        setRespectedNotes(JSON.parse(savedRespected));
-      } catch (e) {}
-    }
-
-    fetchNotes(profile?.email);
   }, []);
 
   const fetchNotes = async (userEmail?: string) => {
@@ -297,6 +340,18 @@ function SzkolnaPodlogaApp() {
   const handleSelectDevice = (mode: 'mobile' | 'pc') => {
     setDeviceMode(mode);
     setDeviceSelected(true);
+  };
+
+  const handleSignOut = async () => {
+    if (supabaseClient) {
+      await supabaseClient.auth.signOut();
+    }
+    setProfile(null);
+    localStorage.removeItem('sp5_student_profile');
+    localStorage.removeItem('sp5_respected_notes');
+    setRespectedNotes([]);
+    setDeviceSelected(false);
+    setOnboardingOpen(true);
   };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -358,12 +413,10 @@ function SzkolnaPodlogaApp() {
           return;
         }
 
-        const user = data.user;
-        const meta = user?.user_metadata || {};
         const newProfile: StudentProfile = {
-          firstName: meta.first_name || firstNameInput.trim(),
-          lastName: meta.last_name || lastNameInput.trim(),
-          className: meta.class_name || classInput.trim().toUpperCase(),
+          firstName: firstNameInput.trim(),
+          lastName: lastNameInput.trim(),
+          className: classInput.trim().toUpperCase(),
           email: emailClean,
           deviceMode: deviceMode
         };
@@ -519,17 +572,21 @@ function SzkolnaPodlogaApp() {
     }
   };
 
-  const handleRespect = useCallback(async (id: string, e?: React.MouseEvent) => {
+  const handleRespect = useCallback(async (id: string, actionType: 'respect' | 'unrespect', e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
     const isAlreadyRespected = respectedNotes.includes(id);
-    const updatedRespected = isAlreadyRespected
-      ? respectedNotes.filter(item => item !== id)
-      : [...respectedNotes, id];
+    if (actionType === 'respect' && isAlreadyRespected) return;
+    if (actionType === 'unrespect' && !isAlreadyRespected) return;
+
+    const updatedRespected = actionType === 'respect'
+      ? [...respectedNotes, id]
+      : respectedNotes.filter(item => item !== id);
 
     setRespectedNotes(updatedRespected);
+    localStorage.setItem('sp5_respected_notes', JSON.stringify(updatedRespected));
 
-    const delta = isAlreadyRespected ? -1 : 1;
+    const delta = actionType === 'respect' ? 1 : -1;
 
     // Optimistic update
     setNotes(prev =>
@@ -540,7 +597,6 @@ function SzkolnaPodlogaApp() {
     }
 
     try {
-      const actionType = isAlreadyRespected ? 'unrespect' : 'respect';
       const userEmail = profile?.email || null;
       const res = await fetch('/api/notes', {
         method: 'PATCH',
@@ -719,6 +775,8 @@ function SzkolnaPodlogaApp() {
 
   const currentYear = new Date().getFullYear();
 
+  const isRespectedCard = (id: string) => respectedNotes.includes(id);
+
   return (
     <div className={`sp5-container ${deviceMode === 'mobile' ? 'mode-mobile' : 'mode-pc'}`}>
       {/* Permanent Sidebar Ranking Panel (PC only) */}
@@ -775,18 +833,10 @@ function SzkolnaPodlogaApp() {
                 {isCreator && <span className="sp5-creator-badge">👑 TWÓRCA STRONY</span>}
                 <button
                   className="sp5-change-btn"
-                  onClick={() => {
-                    setFirstNameInput(profile.firstName);
-                    setLastNameInput(profile.lastName);
-                    setClassInput(profile.className);
-                    setEmailInput(profile.email || '');
-                    setPasswordInput('');
-                    setAuthMode('signin');
-                    setDeviceSelected(true);
-                    setOnboardingOpen(true);
-                  }}
+                  onClick={handleSignOut}
+                  style={{ color: '#fca5a5' }}
                 >
-                  Zmień dane
+                  Wyloguj się
                 </button>
               </div>
             )}
@@ -884,7 +934,7 @@ function SzkolnaPodlogaApp() {
               key={note.id}
               note={note}
               isCreator={isCreator}
-              isRespected={respectedNotes.includes(note.id)}
+              isRespected={isRespectedCard(note.id)}
               onCardClick={setActiveCard}
               onRespect={handleRespect}
               onDelete={(id, e) => {
@@ -1250,10 +1300,22 @@ function SzkolnaPodlogaApp() {
 
             <div className="sp5-detail-actions">
               <button
-                className="sp5-btn-primary"
-                onClick={() => handleRespect(activeCard.id)}
+                className={`sp5-btn-primary ${isRespectedCard(activeCard.id) ? 'disabled' : ''}`}
+                style={{ opacity: isRespectedCard(activeCard.id) ? 0.6 : 1 }}
+                onClick={() => {
+                  if (!isRespectedCard(activeCard.id)) handleRespect(activeCard.id, 'respect');
+                }}
               >
-                🔥 Szacun (+1)
+                👏 Szacun ({activeCard.respect_count})
+              </button>
+              <button
+                className={`sp5-btn-secondary ${!isRespectedCard(activeCard.id) ? 'disabled' : ''}`}
+                style={{ opacity: !isRespectedCard(activeCard.id) ? 0.5 : 1, background: '#7f1d1d' }}
+                onClick={() => {
+                  if (isRespectedCard(activeCard.id)) handleRespect(activeCard.id, 'unrespect');
+                }}
+              >
+                👎 Unszacun
               </button>
               {isCreator && (
                 <>
