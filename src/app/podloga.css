@@ -642,12 +642,24 @@ html, body {
 .sp5-fab-container {
   position: fixed;
   bottom: 16px;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
   z-index: 90;
   pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+
+.sp5-container.mode-pc .sp5-fab-container {
+  left: calc(50% + 152px);
+  transform: translateX(-50%);
+  right: auto;
+}
+
+.sp5-container.mode-mobile .sp5-fab-container {
+  left: 50%;
+  transform: translateX(-50%);
+  right: auto;
+  width: 100%;
+  max-width: 420px;
   padding: 0 12px;
 }
 
