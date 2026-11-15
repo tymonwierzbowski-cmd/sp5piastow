@@ -19,7 +19,7 @@
 }
 
 html, body {
-  background: linear-gradient(to bottom, rgba(12, 16, 20, 0.45), rgba(12, 16, 20, 0.78)), url('/sp5-bg.jpg') no-repeat center center fixed;
+  background: linear-gradient(to bottom, rgba(12, 16, 20, 0.45), rgba(12, 16, 20, 0.78)), url('/unnamed.webp') no-repeat center center fixed;
   background-size: cover;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   color: #f3f4f6;
