@@ -524,12 +524,12 @@ function SzkolnaPodlogaApp() {
                   const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
                   return (
                     <div key={item.className} className="sp5-ranking-item">
-                      <div className="sp5-ranking-row-top">
+                      <div className="sp5-ranking-row-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                         <span className="sp5-ranking-place">
                           {medals[idx] || `${idx + 1}.`} <strong>Klasa {item.className}</strong>
                         </span>
                         <span className="sp5-ranking-score">
-                          {item.score} pkt <span className="sp5-ranking-details">({item.notesCount} kartek, 🔥 {item.respectSum})</span>
+                          — {item.score} pkt <span className="sp5-ranking-details">({item.notesCount} kartek, 🔥 {item.respectSum})</span>
                         </span>
                       </div>
                       <div className="sp5-ranking-bar-bg">
