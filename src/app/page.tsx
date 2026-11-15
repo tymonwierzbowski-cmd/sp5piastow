@@ -493,40 +493,42 @@ function SzkolnaPodlogaApp() {
 
   return (
     <div className={`sp5-container ${deviceMode === 'mobile' ? 'mode-mobile' : 'mode-pc'}`}>
-      {/* Permanent Sidebar Ranking Panel */}
-      <aside className="sp5-sidebar">
-        <div className="sp5-ranking-sidebar-card">
-          <h3 className="sp5-sidebar-title">🏆 Ranking TOP 5 Klas</h3>
-          <p className="sp5-sidebar-subtitle">Puchar Klas SP5 • Punkty za kartki i Szacun</p>
-          <div className="sp5-ranking-list">
-            {rankedClasses.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#a7f3d0', fontSize: '0.85rem' }}>
-                Brak punktów — rzuć kartkę jako pierwszy!
-              </p>
-            ) : (
-              rankedClasses.map((item, idx) => {
-                const progressPct = topLeaderScore > 0 ? Math.round((item.score / topLeaderScore) * 100) : 0;
-                const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-                return (
-                  <div key={item.className} className="sp5-ranking-item">
-                    <div className="sp5-ranking-row-top">
-                      <span className="sp5-ranking-place">
-                        {medals[idx] || `${idx + 1}.`} <strong>Klasa {item.className}</strong>
-                      </span>
-                      <span className="sp5-ranking-score">
-                        {item.score} pkt <span className="sp5-ranking-details">({item.notesCount} kartek, 🔥 {item.respectSum})</span>
-                      </span>
+      {/* Permanent Sidebar Ranking Panel (PC only) */}
+      {deviceMode === 'pc' && (
+        <aside className="sp5-sidebar">
+          <div className="sp5-ranking-sidebar-card">
+            <h3 className="sp5-sidebar-title">🏆 Ranking TOP 5 Klas</h3>
+            <p className="sp5-sidebar-subtitle">Puchar Klas SP5 • Punkty za kartki i Szacun</p>
+            <div className="sp5-ranking-list">
+              {rankedClasses.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#a7f3d0', fontSize: '0.85rem' }}>
+                  Brak punktów — rzuć kartkę jako pierwszy!
+                </p>
+              ) : (
+                rankedClasses.map((item, idx) => {
+                  const progressPct = topLeaderScore > 0 ? Math.round((item.score / topLeaderScore) * 100) : 0;
+                  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+                  return (
+                    <div key={item.className} className="sp5-ranking-item">
+                      <div className="sp5-ranking-row-top">
+                        <span className="sp5-ranking-place">
+                          {medals[idx] || `${idx + 1}.`} <strong>Klasa {item.className}</strong>
+                        </span>
+                        <span className="sp5-ranking-score">
+                          {item.score} pkt <span className="sp5-ranking-details">({item.notesCount} kartek, 🔥 {item.respectSum})</span>
+                        </span>
+                      </div>
+                      <div className="sp5-ranking-bar-bg">
+                        <div className="sp5-ranking-bar-fill" style={{ width: `${progressPct}%` }}></div>
+                      </div>
                     </div>
-                    <div className="sp5-ranking-bar-bg">
-                      <div className="sp5-ranking-bar-fill" style={{ width: `${progressPct}%` }}></div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       {/* Header & Controls */}
       <header className="sp5-header">
