@@ -44,6 +44,56 @@ const bellSchedule = [
   { name: 'Przerwa', startH: 16, startM: 20, endH: 16, endM: 30, type: 'break' },
 ];
 
+const SchoolClock = React.memo(() => {
+  const [bellStatus, setBellStatus] = useState('Koniec lekcji');
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      const day = now.getDay(); // 0 = Sunday, 6 = Saturday
+
+      if (day === 0 || day === 6) {
+        setBellStatus('Koniec lekcji (Weekend)');
+        return;
+      }
+
+      const currentSecs = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      let foundStatus = 'Po lekcjach';
+
+      for (const p of bellSchedule) {
+        const pStart = p.startH * 3600 + p.startM * 60;
+        const pEnd = p.endH * 3600 + p.endM * 60;
+
+        if (currentSecs >= pStart && currentSecs <= pEnd) {
+          if (p.type === 'lesson') {
+            const leftSecs = pEnd - currentSecs;
+            const m = Math.floor(leftSecs / 60);
+            const s = leftSecs % 60;
+            foundStatus = `${p.name} (do końca ${m}m ${s < 10 ? '0' : ''}${s}s)`;
+          } else {
+            const leftSecs = pEnd - currentSecs;
+            const m = Math.floor(leftSecs / 60);
+            const s = leftSecs % 60;
+            foundStatus = `Przerwa (do końca ${m}m ${s < 10 ? '0' : ''}${s}s)`;
+          }
+          break;
+        } else if (currentSecs < pStart) {
+          foundStatus = `Przed lekcją (${p.name} o ${p.startH}:${p.startM < 10 ? '0' : ''}${p.startM})`;
+          break;
+        }
+      }
+      setBellStatus(foundStatus);
+    };
+
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return <strong>{bellStatus}</strong>;
+});
+SchoolClock.displayName = 'SchoolClock';
+
 interface NoteCardProps {
   note: Note;
   isCreator: boolean;
@@ -152,9 +202,6 @@ function SzkolnaPodlogaApp() {
   // Detail Modal
   const [activeCard, setActiveCard] = useState<Note | null>(null);
 
-  // Bell countdown timer state
-  const [bellStatus, setBellStatus] = useState('Koniec lekcji');
-
   // Check if current user is Creator (Tymon Wierzbowski or URL admin)
   const isCreator =
     urlAdmin ||
@@ -163,7 +210,6 @@ function SzkolnaPodlogaApp() {
       profile.lastName.trim().toLowerCase() === 'wierzbowski');
 
   useEffect(() => {
-    // Auto-detect or load device mode and profile
     const autoMode = window.innerWidth < 900 ? 'mobile' : 'pc';
     setDeviceMode(autoMode);
     setDeviceModeInput(autoMode);
@@ -192,48 +238,6 @@ function SzkolnaPodlogaApp() {
     }
 
     fetchNotes();
-
-    // Schedule clock
-    const updateClock = () => {
-      const now = new Date();
-      const day = now.getDay(); // 0 = Sunday, 6 = Saturday
-
-      if (day === 0 || day === 6) {
-        setBellStatus('Koniec lekcji (Weekend)');
-        return;
-      }
-
-      const currentSecs = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-      let foundStatus = 'Po lekcjach';
-
-      for (const p of bellSchedule) {
-        const pStart = p.startH * 3600 + p.startM * 60;
-        const pEnd = p.endH * 3600 + p.endM * 60;
-
-        if (currentSecs >= pStart && currentSecs <= pEnd) {
-          if (p.type === 'lesson') {
-            const leftSecs = pEnd - currentSecs;
-            const m = Math.floor(leftSecs / 60);
-            const s = leftSecs % 60;
-            foundStatus = `${p.name} (do końca ${m}m ${s < 10 ? '0' : ''}${s}s)`;
-          } else {
-            const leftSecs = pEnd - currentSecs;
-            const m = Math.floor(leftSecs / 60);
-            const s = leftSecs % 60;
-            foundStatus = `Przerwa (do końca ${m}m ${s < 10 ? '0' : ''}${s}s)`;
-          }
-          break;
-        } else if (currentSecs < pStart) {
-          foundStatus = `Przed lekcją (${p.name} o ${p.startH}:${p.startM < 10 ? '0' : ''}${p.startM})`;
-          break;
-        }
-      }
-      setBellStatus(foundStatus);
-    };
-
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
   }, []);
 
   const fetchNotes = async () => {
@@ -570,7 +574,7 @@ function SzkolnaPodlogaApp() {
                   }}
                   title="Przełącz tryb urządzenia (Telefon / PC)"
                 >
-                  {deviceMode === 'mobile' ? '📱 Telefon' : '💻 PC'}
+                  {deviceMode === 'mobile' ? '💻 Przełącz na PC' : '📱 Przełącz na Telefon'}
                 </button>
               </div>
             )}
@@ -583,7 +587,7 @@ function SzkolnaPodlogaApp() {
             🏆 Najbardziej aktywna klasa: <strong>{activeClass}</strong>
           </div>
           <div className="sp5-hud-item">
-            ⏰ Zegar SP5: <strong>{bellStatus}</strong>
+            ⏰ Zegar SP5: <SchoolClock />
           </div>
           <div className="sp5-hud-item">
             📄 Kartek na podłodze: <strong>{notes.length}</strong>
@@ -752,7 +756,7 @@ function SzkolnaPodlogaApp() {
                     style={{ flex: 1, textAlign: 'center', padding: '10px', background: deviceModeInput === 'mobile' ? '#2563eb' : '#27272a', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
                     onClick={() => setDeviceModeInput('mobile')}
                   >
-                    📱 Telefon (Mobilna)
+                    📱 Jestem na Telefonie
                   </button>
                   <button
                     type="button"
@@ -760,7 +764,7 @@ function SzkolnaPodlogaApp() {
                     style={{ flex: 1, textAlign: 'center', padding: '10px', background: deviceModeInput === 'pc' ? '#2563eb' : '#27272a', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
                     onClick={() => setDeviceModeInput('pc')}
                   >
-                    💻 Komputer (PC)
+                    💻 Jestem na Komputerze (PC)
                   </button>
                 </div>
               </div>
