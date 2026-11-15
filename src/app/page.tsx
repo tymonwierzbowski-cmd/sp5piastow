@@ -296,6 +296,15 @@ function SzkolnaPodlogaApp() {
 
   const handleRespect = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+
+    // Optimistic update
+    setNotes(prev =>
+      prev.map(n => (n.id === id ? { ...n, respect_count: (n.respect_count || 0) + 1 } : n))
+    );
+    if (activeCard && activeCard.id === id) {
+      setActiveCard(prev => (prev ? { ...prev, respect_count: (prev.respect_count || 0) + 1 } : null));
+    }
+
     try {
       const res = await fetch('/api/notes', {
         method: 'PATCH',
@@ -590,9 +599,14 @@ function SzkolnaPodlogaApp() {
                 <h3>Zbieranie kartek z podłogi...</h3>
               </div>
             ) : filteredNotes.length === 0 ? (
-              <div className="empty-state">
-                <h3>Brak kartek na podłodze</h3>
-                <p>Bądź pierwszy i rzuć swoją kartkę z pamiątką!</p>
+              <div className="empty-state chalkboard-empty">
+                <div className="chalkboard-message-box">
+                  <h3>Podłoga jest jeszcze czysta!</h3>
+                  <p>Bądź pierwszą osobą z SP5 Piastów, która rzuci tu swoją kartkę.</p>
+                  <button className="sp5-btn-primary" onClick={handleOpenAddModal} style={{ marginTop: '16px' }}>
+                    + Rzuć pierwszą kartkę
+                  </button>
+                </div>
               </div>
             ) : (
               filteredNotes.map(note => (

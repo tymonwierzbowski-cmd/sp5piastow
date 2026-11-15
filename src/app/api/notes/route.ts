@@ -7,219 +7,7 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || 'sp5admin2026';
 
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
-// Starter notes without sticky notes
-const starterNotes = [
-  {
-    id: 'starter-1',
-    first_name: 'Kacper',
-    last_name: 'Wiśniewski',
-    class_name: '8A',
-    year_written: 2026,
-    message: 'Kto pamięta legendarne bułki z szynką w szkolnym sklepiku? Pozdrowienia dla całej SP5!',
-    paper_style: 'grid',
-    rotation: -2.5,
-    ip_address: '127.0.0.1',
-    respect_count: 24,
-    created_at: new Date(Date.now() - 86400000 * 5).toISOString()
-  },
-  {
-    id: 'starter-2',
-    first_name: 'Zuzia',
-    last_name: 'Kowalska',
-    class_name: '7B',
-    year_written: 2026,
-    message: 'Najlepsza klasa 7B pozdrawia panią od biologii! Kto idzie na oranżadę po lekcjach?',
-    paper_style: 'lined',
-    rotation: 1.8,
-    ip_address: '127.0.0.2',
-    respect_count: 19,
-    created_at: new Date(Date.now() - 86400000 * 4).toISOString()
-  },
-  {
-    id: 'starter-3',
-    first_name: 'Bartek',
-    last_name: 'Nowak',
-    class_name: '8C',
-    year_written: 2026,
-    message: 'Piastów rulez! SP5 na zawsze w sercu. Kto gra w piłkę na boisku asfaltowym po dzwonku?',
-    paper_style: 'grid',
-    rotation: 3.2,
-    ip_address: '127.0.0.3',
-    respect_count: 31,
-    created_at: new Date(Date.now() - 86400000 * 3).toISOString()
-  },
-  {
-    id: 'starter-4',
-    first_name: 'Tymon',
-    last_name: 'Wierzbowski',
-    class_name: '8B',
-    year_written: 2026,
-    message: 'Złota Legenda SP5: Witajcie na oficjalnej podłodze naszej szkoły! Piszcie z szacunkiem i tworzymy historię.',
-    paper_style: 'gold',
-    rotation: -0.5,
-    ip_address: '127.0.0.4',
-    respect_count: 99,
-    created_at: new Date(Date.now() - 86400000 * 10).toISOString()
-  },
-  {
-    id: 'starter-5',
-    first_name: 'Ola',
-    last_name: 'Zielińska',
-    class_name: '6A',
-    year_written: 2025,
-    message: 'Kto zgubił czarną bluzę z kapturem w szatni? Czeka na portierni! Pozdro dla 6A.',
-    paper_style: 'lined',
-    rotation: -3.8,
-    ip_address: '127.0.0.5',
-    respect_count: 12,
-    created_at: new Date(Date.now() - 86400000 * 20).toISOString()
-  },
-  {
-    id: 'starter-6',
-    first_name: 'Michał',
-    last_name: 'Wójcik',
-    class_name: '8B',
-    year_written: 2026,
-    message: 'Matma z panem profesorem to czysta przygoda. Kto ma pożyczyć cyrkiel na zaraz?',
-    paper_style: 'grid',
-    rotation: 2.1,
-    ip_address: '127.0.0.6',
-    respect_count: 15,
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString()
-  },
-  {
-    id: 'starter-7',
-    first_name: 'Julia',
-    last_name: 'Kamińska',
-    class_name: '5B',
-    year_written: 2026,
-    message: 'Uwielbiam świetlicę w SP5! Nasze rysunki wiszą na tablicy. Pozdrowienia dla pani wychowawczyni!',
-    paper_style: 'lined',
-    rotation: -1.2,
-    ip_address: '127.0.0.7',
-    respect_count: 22,
-    created_at: new Date(Date.now() - 86400000 * 1).toISOString()
-  },
-  {
-    id: 'starter-8',
-    first_name: 'Tomek',
-    last_name: 'Lewandowski',
-    class_name: '8A',
-    year_written: 2026,
-    message: 'Ostatni rok w tej szkole... Będzie mi brakowało tych schodów i hałasów na przerwach. Trzymajcie się!',
-    paper_style: 'grid',
-    rotation: 3.5,
-    ip_address: '127.0.0.8',
-    respect_count: 40,
-    created_at: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'starter-9',
-    first_name: 'Karolina',
-    last_name: 'Adamczyk',
-    class_name: '7A',
-    year_written: 2026,
-    message: 'Kto pożyczy notatki z historii? Zbliża się kartkówka z II wojny światowej, ratunku!',
-    paper_style: 'lined',
-    rotation: -2.1,
-    ip_address: '127.0.0.9',
-    respect_count: 18,
-    created_at: new Date(Date.now() - 86400000 * 6).toISOString()
-  },
-  {
-    id: 'starter-10',
-    first_name: 'Mateusz',
-    last_name: 'Wójcik',
-    class_name: '6C',
-    year_written: 2026,
-    message: 'Najlepsze boisko do kosza jest za halą sportową w SP5! Kto gram w środę po lekcjach?',
-    paper_style: 'grid',
-    rotation: 1.4,
-    ip_address: '127.0.0.10',
-    respect_count: 27,
-    created_at: new Date(Date.now() - 86400000 * 7).toISOString()
-  },
-  {
-    id: 'starter-11',
-    first_name: 'Natalia',
-    last_name: 'Dąbrowska',
-    class_name: '8B',
-    year_written: 2026,
-    message: 'Pozdrowienia dla całej ekipy z 8B! Będziemy tęsknić za naszymi rozrabianiami w SP5.',
-    paper_style: 'grid',
-    rotation: -3.0,
-    ip_address: '127.0.0.11',
-    respect_count: 35,
-    created_at: new Date(Date.now() - 86400000 * 8).toISOString()
-  },
-  {
-    id: 'starter-12',
-    first_name: 'Jakub',
-    last_name: 'Kamiński',
-    class_name: '7B',
-    year_written: 2026,
-    message: 'Kto pamięta zieloną szkołę i nocne narady w pokoju? To były legendarne czasy!',
-    paper_style: 'lined',
-    rotation: 2.7,
-    ip_address: '127.0.0.12',
-    respect_count: 29,
-    created_at: new Date(Date.now() - 86400000 * 9).toISOString()
-  },
-  {
-    id: 'starter-13',
-    first_name: 'Oliwia',
-    last_name: 'Szymańska',
-    class_name: '5B',
-    year_written: 2026,
-    message: 'Nasza pani od polskiego jest super, chociaż każe czytać dużo książek. Pozdro dla 5B!',
-    paper_style: 'lined',
-    rotation: -1.5,
-    ip_address: '127.0.0.13',
-    respect_count: 14,
-    created_at: new Date(Date.now() - 86400000 * 1.5).toISOString()
-  },
-  {
-    id: 'starter-14',
-    first_name: 'Filip',
-    last_name: 'Mazur',
-    class_name: '8A',
-    year_written: 2026,
-    message: 'Kto ma fizykę z panem dyrektorem? Trzymajcie się, damy radę z Otwartym Zadaniem!',
-    paper_style: 'grid',
-    rotation: 0.9,
-    ip_address: '127.0.0.14',
-    respect_count: 33,
-    created_at: new Date(Date.now() - 7200000).toISOString()
-  },
-  {
-    id: 'starter-15',
-    first_name: 'Maja',
-    last_name: 'Wójcik',
-    class_name: '6A',
-    year_written: 2026,
-    message: 'Piastów to super miasto, a SP5 to najlepsza podstawówka w województwie!',
-    paper_style: 'lined',
-    rotation: -2.8,
-    ip_address: '127.0.0.15',
-    respect_count: 21,
-    created_at: new Date(Date.now() - 5000000).toISOString()
-  },
-  {
-    id: 'starter-16',
-    first_name: 'Dawid',
-    last_name: 'Krawczyk',
-    class_name: '7A',
-    year_written: 2026,
-    message: 'Kto idzie na zapiekanki po lekcjach na ul. Piłsudskiego? Kto pierwszy, ten lepszy!',
-    paper_style: 'grid',
-    rotation: 3.1,
-    ip_address: '127.0.0.16',
-    respect_count: 28,
-    created_at: new Date(Date.now() - 1800000).toISOString()
-  }
-];
-
-let inMemoryNotes = [...starterNotes];
+let inMemoryNotes: any[] = [];
 
 const profanityList = ['kurw', 'chuj', 'pizd', 'jeb', 'huj', 'cip', 'pedal', 'skurw', 'pierd', 'fujara', 'kretyn', 'debil'];
 function containsProfanity(text: string): boolean {
@@ -263,13 +51,13 @@ export async function GET(req: Request) {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return NextResponse.json({ notes: data && data.length > 0 ? data : starterNotes, source: 'supabase-fallback' });
+    if (error) {
+      return NextResponse.json({ notes: [], error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ notes: data, source: 'supabase' });
+    return NextResponse.json({ notes: data || [], source: 'supabase' });
   } catch (err: any) {
-    return NextResponse.json({ notes: starterNotes, source: 'error-fallback', error: err.message });
+    return NextResponse.json({ notes: [], source: 'error-fallback', error: err.message });
   }
 }
 
@@ -458,7 +246,6 @@ export async function PATCH(req: Request) {
         const note = inMemoryNotes.find(n => n.id === id);
         if (note) {
           note.paper_style = 'gold';
-          // Move to top
           inMemoryNotes = [note, ...inMemoryNotes.filter(n => n.id !== id)];
           return NextResponse.json({ success: true, paper_style: 'gold' });
         }
