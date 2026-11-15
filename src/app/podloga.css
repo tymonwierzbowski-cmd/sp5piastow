@@ -113,14 +113,15 @@ html, body {
 }
 
 .sp5-container.mode-pc {
-  max-width: 1380px;
-  width: 95%;
+  max-width: 1520px;
+  width: 96%;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 280px minmax(0, 900px) 280px;
   grid-template-rows: auto auto;
   gap: 24px;
   align-items: start;
+  justify-content: center;
 }
 .sp5-container.mode-pc .sp5-sidebar {
   grid-column: 1 / 2;
@@ -137,9 +138,21 @@ html, body {
   grid-row: 2 / 3;
   grid-template-columns: repeat(3, 1fr);
 }
-@media (min-width: 1200px) {
+@media (max-width: 1200px) {
+  .sp5-container.mode-pc {
+    grid-template-columns: 260px 1fr;
+    max-width: 1200px;
+  }
+  .sp5-container.mode-pc .sp5-sidebar {
+    grid-column: 1 / 2;
+    grid-row: 1 / 3;
+  }
+  .sp5-container.mode-pc .sp5-header,
   .sp5-container.mode-pc .sp5-floor-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-column: 2 / 3;
+  }
+  .sp5-container.mode-pc .sp5-floor-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -649,7 +662,7 @@ html, body {
 }
 
 .sp5-container.mode-pc .sp5-fab-container {
-  left: calc(50% + 152px);
+  left: 50%;
   transform: translateX(-50%);
   right: auto;
 }
