@@ -236,14 +236,14 @@ function SzkolnaPodlogaApp() {
 
   // Detail Modal
   const [activeCard, setActiveCard] = useState<Note | null>(null);
-  const [isDevModeActive, setIsDevModeActive] = useState(true);
+  const [devModeEnabled, setDevModeEnabled] = useState(true);
 
-  // Check if current user is Creator (tymon.wierzbowski@gmail.com or URL admin)
-  const isRealCreator =
+  // Check if current user is Developer account (tymon.wierzbowski@gmail.com or URL admin)
+  const isDeveloperAccount =
     urlAdmin ||
     (profile !== null &&
       profile.email?.trim().toLowerCase() === 'tymon.wierzbowski@gmail.com');
-  const isCreator = isRealCreator && isDevModeActive;
+  const isCreator = isDeveloperAccount && devModeEnabled;
 
   useEffect(() => {
     setDeviceSelected(false);
@@ -718,16 +718,7 @@ function SzkolnaPodlogaApp() {
                 <span>
                   {profile.firstName} {profile.lastName} ({profile.className})
                 </span>
-                {isRealCreator && <span className="sp5-creator-badge">👑 TWÓRCA STRONY</span>}
-                {isRealCreator && (
-                  <button
-                    className="sp5-dev-toggle-btn"
-                    onClick={() => setIsDevModeActive(!isDevModeActive)}
-                    title={isDevModeActive ? 'Wyłącz tryb developera (podgląd jako uczeń)' : 'Włącz tryb developera (narzędzia administratora)'}
-                  >
-                    {isDevModeActive ? '🛠️ Tryb Dev: WŁ. (Wyłącz)' : '👁️ Tryb Dev: WYŁ. (Włącz)'}
-                  </button>
-                )}
+                {isDeveloperAccount && <span className="sp5-creator-badge">👑 TWÓRCA STRONY</span>}
                 <button
                   className="sp5-logout-btn"
                   onClick={handleSignOut}
@@ -751,9 +742,16 @@ function SzkolnaPodlogaApp() {
           <div className="sp5-hud-item">
             📄 Kartek na podłodze: <strong>{notes.length}</strong>
           </div>
-          {isCreator && (
-            <div className="sp5-hud-item" style={{ color: '#fbbf24' }}>
-              ✨ Tryb Twórcy aktywny (Brak limitu IP, Pełna Edycja)
+          {isDeveloperAccount && (
+            <div className="sp5-hud-item">
+              <button
+                type="button"
+                className="sp5-dev-hud-toggle-btn"
+                onClick={() => setDevModeEnabled(!devModeEnabled)}
+                title={devModeEnabled ? 'Kliknij, aby wyłączyć tryb developera' : 'Kliknij, aby włączyć tryb developera'}
+              >
+                {devModeEnabled ? '🛠️ Tryb Dev: WŁĄCZONY (Kliknij, aby wyłączyć)' : '👁️ Tryb Dev: WYŁĄCZONY (Kliknij, aby włączyć)'}
+              </button>
             </div>
           )}
         </div>
