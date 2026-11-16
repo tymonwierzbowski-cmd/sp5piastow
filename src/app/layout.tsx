@@ -16,7 +16,10 @@ export const metadata: Metadata = {
     title: "SP5 Piastów — Szkolna Podłoga | Kartki i Pamiątki Uczniów SP5",
     description: "Zostaw swoją kartkę z pamiątką na szkolnej podłodze SP5 Piastów.",
     type: "website",
-  }
+  },
+  verification: {
+    google: '9e3657fb1930d786',
+  },
 };
 
 export default function RootLayout({
