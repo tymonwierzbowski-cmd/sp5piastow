@@ -1,5 +1,5 @@
 -- SQL Schema for SP5 Piastów Szkolna Podłoga
--- Table: sp5_notes
+-- Tables: sp5_notes, sp5_accounts, sp5_respects
 
 create table if not exists public.sp5_notes (
   id uuid default gen_random_uuid() primary key,
@@ -12,36 +12,49 @@ create table if not exists public.sp5_notes (
   rotation numeric not null default 0, -- -4 to 4 degrees
   ip_address text not null,
   respect_count integer not null default 0,
+  user_email text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table if not exists public.sp5_accounts (
+  id uuid default gen_random_uuid() primary key,
+  email text unique not null,
+  password_hash text not null,
+  first_name text not null,
+  last_name text not null,
+  class_name text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table if not exists public.sp5_respects (
+  id uuid default gen_random_uuid() primary key,
+  user_email text not null,
+  note_id uuid not null references public.sp5_notes(id) on delete cascade,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_note_respect unique (user_email, note_id)
 );
 
 -- Enable Row Level Security
 alter table public.sp5_notes enable row level security;
+alter table public.sp5_accounts enable row level security;
+alter table public.sp5_respects enable row level security;
 
 -- Policies
--- Anyone can read notes
-create policy "Allow public read access"
-  on public.sp5_notes
-  for select
-  using (true);
+create policy "Allow public read access notes" on public.sp5_notes for select using (true);
+create policy "Allow public insert access notes" on public.sp5_notes for insert with check (true);
+create policy "Allow public update notes" on public.sp5_notes for update using (true);
+create policy "Allow public delete notes" on public.sp5_notes for delete using (true);
 
--- Anyone can insert notes (backend API validates IP check)
-create policy "Allow public insert access"
-  on public.sp5_notes
-  for insert
-  with check (true);
+create policy "Allow public read access accounts" on public.sp5_accounts for select using (true);
+create policy "Allow public insert access accounts" on public.sp5_accounts for insert with check (true);
+create policy "Allow public update accounts" on public.sp5_accounts for update using (true);
 
--- Anyone can update respect_count (or we can handle it via backend API)
-create policy "Allow public update respect"
-  on public.sp5_notes
-  for update
-  using (true);
+create policy "Allow public read access respects" on public.sp5_respects for select using (true);
+create policy "Allow public insert access respects" on public.sp5_respects for insert with check (true);
+create policy "Allow public delete respects" on public.sp5_respects for delete using (true);
 
--- Only admin (or service role) can delete
-create policy "Allow delete for admin"
-  on public.sp5_notes
-  for delete
-  using (true);
-
--- Create index on ip_address for fast IP check
+-- Indexes
 create index if not exists idx_sp5_notes_ip on public.sp5_notes(ip_address);
+create index if not exists idx_sp5_notes_email on public.sp5_notes(user_email);
+create index if not exists idx_sp5_accounts_email on public.sp5_accounts(email);
+create index if not exists idx_sp5_respects_email_note on public.sp5_respects(user_email, note_id);
