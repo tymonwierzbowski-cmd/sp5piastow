@@ -310,6 +310,25 @@ html, body {
   gap: 4px;
 }
 
+.sp5-dev-toggle-btn {
+  background: rgba(251, 191, 36, 0.2);
+  border: 1px solid #fbbf24;
+  color: #fde047;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+.sp5-dev-toggle-btn:hover {
+  background: rgba(251, 191, 36, 0.35);
+  color: #fff;
+}
+
 .sp5-logout-btn {
   background: transparent;
   border: none;

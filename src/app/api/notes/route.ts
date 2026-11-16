@@ -35,9 +35,16 @@ function getClientIp(req: Request): string {
   return '127.0.0.1';
 }
 
-function isAdminRequest(req: Request): boolean {
+function isAdminRequest(req: Request, userEmail?: string): boolean {
   const adminKeyHeader = req.headers.get('x-admin-key');
-  return adminKeyHeader === ADMIN_SECRET || adminKeyHeader === 'sp5admin2026';
+  if (adminKeyHeader === ADMIN_SECRET || adminKeyHeader === 'sp5admin2026') return true;
+  const userEmailHeader = req.headers.get('x-user-email');
+  if (userEmailHeader && userEmailHeader.trim().toLowerCase() === 'tymon.wierzbowski@gmail.com') return true;
+  if (userEmail && userEmail.trim().toLowerCase() === 'tymon.wierzbowski@gmail.com') return true;
+  const url = new URL(req.url);
+  const emailParam = url.searchParams.get('email');
+  if (emailParam && emailParam.trim().toLowerCase() === 'tymon.wierzbowski@gmail.com') return true;
+  return false;
 }
 
 function isValidSp5Class(className: string): boolean {
@@ -115,7 +122,8 @@ export async function POST(req: Request) {
     const year_written = new Date().getFullYear();
     const rotation = Number((Math.random() * 8 - 4).toFixed(1));
 
-    const checkIsCreator = is_creator || (first_name.trim().toLowerCase() === 'tymon' && last_name.trim().toLowerCase() === 'wierzbowski');
+    const cleanEmail = user_email ? user_email.trim().toLowerCase() : '';
+    const checkIsCreator = is_creator || (cleanEmail === 'tymon.wierzbowski@gmail.com');
     
     // Validate paper style
     let style = 'grid';
@@ -215,8 +223,9 @@ export async function DELETE(req: Request) {
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
+    const emailParam = url.searchParams.get('email');
 
-    if (!isAdminRequest(req) && url.searchParams.get('admin') !== 'sp5admin2026') {
+    if (!isAdminRequest(req) && url.searchParams.get('admin') !== 'sp5admin2026' && !(emailParam && emailParam.trim().toLowerCase() === 'tymon.wierzbowski@gmail.com')) {
       return NextResponse.json({ error: 'Brak uprawnień administratora (Twórcy Strony).' }, { status: 403 });
     }
 
@@ -329,7 +338,8 @@ export async function PATCH(req: Request) {
     }
 
     if (action === 'reset_respect') {
-      if (!isAdminRequest(req)) {
+      const isCreatorByEmail = user_email && user_email.trim().toLowerCase() === 'tymon.wierzbowski@gmail.com';
+      if (!isAdminRequest(req, user_email) && !isCreatorByEmail) {
         return NextResponse.json({ error: 'Brak uprawnień Twórcy Strony.' }, { status: 403 });
       }
 
@@ -357,7 +367,8 @@ export async function PATCH(req: Request) {
     }
 
     if (action === 'make_gold') {
-      if (!isAdminRequest(req)) {
+      const isCreatorByEmail = user_email && user_email.trim().toLowerCase() === 'tymon.wierzbowski@gmail.com';
+      if (!isAdminRequest(req, user_email) && !isCreatorByEmail) {
         return NextResponse.json({ error: 'Brak uprawnień Twórcy Strony.' }, { status: 403 });
       }
 

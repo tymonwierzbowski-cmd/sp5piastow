@@ -236,13 +236,14 @@ function SzkolnaPodlogaApp() {
 
   // Detail Modal
   const [activeCard, setActiveCard] = useState<Note | null>(null);
+  const [isDevModeActive, setIsDevModeActive] = useState(true);
 
-  // Check if current user is Creator (Tymon Wierzbowski or URL admin)
-  const isCreator =
+  // Check if current user is Creator (tymon.wierzbowski@gmail.com or URL admin)
+  const isRealCreator =
     urlAdmin ||
     (profile !== null &&
-      profile.firstName.trim().toLowerCase() === 'tymon' &&
-      profile.lastName.trim().toLowerCase() === 'wierzbowski');
+      profile.email?.trim().toLowerCase() === 'tymon.wierzbowski@gmail.com');
+  const isCreator = isRealCreator && isDevModeActive;
 
   useEffect(() => {
     setDeviceSelected(false);
@@ -717,7 +718,16 @@ function SzkolnaPodlogaApp() {
                 <span>
                   {profile.firstName} {profile.lastName} ({profile.className})
                 </span>
-                {isCreator && <span className="sp5-creator-badge">👑 TWÓRCA STRONY</span>}
+                {isRealCreator && <span className="sp5-creator-badge">👑 TWÓRCA STRONY</span>}
+                {isRealCreator && (
+                  <button
+                    className="sp5-dev-toggle-btn"
+                    onClick={() => setIsDevModeActive(!isDevModeActive)}
+                    title={isDevModeActive ? 'Wyłącz tryb developera (podgląd jako uczeń)' : 'Włącz tryb developera (narzędzia administratora)'}
+                  >
+                    {isDevModeActive ? '🛠️ Tryb Dev: WŁ. (Wyłącz)' : '👁️ Tryb Dev: WYŁ. (Włącz)'}
+                  </button>
+                )}
                 <button
                   className="sp5-logout-btn"
                   onClick={handleSignOut}
