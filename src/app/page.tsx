@@ -879,29 +879,34 @@ function SzkolnaPodlogaApp() {
               </>
             ) : (
               <>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
-                  <button
-                    type="button"
-                    style={{ flex: 1, background: authMode === 'signin' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px 4px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-                    onClick={() => { setAuthMode('signin'); setAuthError(''); setFormSuccess(''); }}
-                  >
-                    Zaloguj się
-                  </button>
-                  <button
-                    type="button"
-                    style={{ flex: 1, background: authMode === 'signup' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px 4px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-                    onClick={() => { setAuthMode('signup'); setAuthError(''); setFormSuccess(''); }}
-                  >
-                    Załóż konto
-                  </button>
-                  <button
-                    type="button"
-                    style={{ flex: 1, background: authMode === 'reset' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px 4px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-                    onClick={() => { setAuthMode('reset'); setAuthError(''); setFormSuccess(''); }}
-                  >
-                    Reset hasła
-                  </button>
-                </div>
+                {authMode === 'reset' ? (
+                  <div style={{ marginBottom: '16px' }}>
+                    <button
+                      type="button"
+                      style={{ background: 'transparent', border: 'none', color: '#93c5fd', fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: 0 }}
+                      onClick={() => { setAuthMode('signin'); setAuthError(''); setFormSuccess(''); }}
+                    >
+                      ← Wróć do logowania
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+                    <button
+                      type="button"
+                      style={{ flex: 1, background: authMode === 'signin' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px 4px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                      onClick={() => { setAuthMode('signin'); setAuthError(''); setFormSuccess(''); }}
+                    >
+                      Zaloguj się
+                    </button>
+                    <button
+                      type="button"
+                      style={{ flex: 1, background: authMode === 'signup' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px 4px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+                      onClick={() => { setAuthMode('signup'); setAuthError(''); setFormSuccess(''); }}
+                    >
+                      Załóż konto
+                    </button>
+                  </div>
+                )}
 
                 <h2 className="sp5-modal-title">
                   {authMode === 'signin' ? 'Logowanie do SP5' : authMode === 'signup' ? 'Rejestracja w SP5' : 'Reset hasła'}
@@ -1035,6 +1040,18 @@ function SzkolnaPodlogaApp() {
                     </button>
                   </div>
                 </form>
+
+                {authMode === 'signin' && (
+                  <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      style={{ background: 'transparent', border: 'none', color: '#93c5fd', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => { setAuthMode('reset'); setAuthError(''); setFormSuccess(''); }}
+                    >
+                      Zapomniałeś hasła? Zresetuj hasło
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
