@@ -168,13 +168,17 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
             👏 Szacun ({note.respect_count})
           </button>
           <button
-            className={`sp5-respect-btn unrespect-action ${!isRespected ? 'disabled' : ''}`}
+            className="sp5-respect-btn unrespect-action"
             onClick={(e) => {
               e.stopPropagation();
-              if (isRespected) onRespect(note.id, 'unrespect', e);
+              if (isRespected) {
+                onRespect(note.id, 'unrespect', e);
+              } else {
+                alert('Najpierw daj Szacun, żeby go cofnąć');
+              }
             }}
-            disabled={!isRespected}
-            title={!isRespected ? 'Nie dałeś jeszcze Szacunu' : 'Cofnij Szacun (-1)'}
+            title={!isRespected ? 'Najpierw daj Szacun, żeby go cofnąć' : 'Cofnij Szacun (-1)'}
+            style={{ opacity: !isRespected ? 0.6 : 1 }}
           >
             👎 Unszacun
           </button>
@@ -715,9 +719,9 @@ function SzkolnaPodlogaApp() {
                 </span>
                 {isCreator && <span className="sp5-creator-badge">👑 TWÓRCA STRONY</span>}
                 <button
-                  className="sp5-change-btn"
+                  className="sp5-logout-btn"
                   onClick={handleSignOut}
-                  style={{ color: '#fca5a5', marginLeft: '6px' }}
+                  title="Wyloguj się z konta"
                 >
                   Wyloguj się
                 </button>
@@ -1148,11 +1152,16 @@ function SzkolnaPodlogaApp() {
                 👏 Szacun ({activeCard.respect_count})
               </button>
               <button
-                className={`sp5-btn-secondary ${!isRespectedCard(activeCard.id) ? 'disabled' : ''}`}
-                style={{ opacity: !isRespectedCard(activeCard.id) ? 0.5 : 1, background: '#7f1d1d' }}
+                className="sp5-btn-secondary"
+                style={{ opacity: !isRespectedCard(activeCard.id) ? 0.6 : 1, background: '#7f1d1d' }}
                 onClick={() => {
-                  if (isRespectedCard(activeCard.id)) handleRespect(activeCard.id, 'unrespect');
+                  if (isRespectedCard(activeCard.id)) {
+                    handleRespect(activeCard.id, 'unrespect');
+                  } else {
+                    alert('Najpierw daj Szacun, żeby go cofnąć');
+                  }
                 }}
+                title={!isRespectedCard(activeCard.id) ? 'Najpierw daj Szacun, żeby go cofnąć' : 'Cofnij Szacun (-1)'}
               >
                 👎 Unszacun
               </button>
