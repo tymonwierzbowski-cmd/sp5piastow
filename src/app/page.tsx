@@ -246,18 +246,34 @@ function SzkolnaPodlogaApp() {
   const isCreator = isDeveloperAccount && devModeEnabled;
 
   useEffect(() => {
-    setDeviceSelected(false);
-    setOnboardingOpen(true);
+    const savedSession = localStorage.getItem('sp5_user_session') || localStorage.getItem('sp5_student_profile');
+    const savedDevice = localStorage.getItem('sp5_device_mode');
 
-    const saved = localStorage.getItem('sp5_student_profile');
-    if (saved) {
+    if (savedSession) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(savedSession);
         setProfile(parsed);
+        setOnboardingOpen(false);
+        if (savedDevice === 'mobile' || savedDevice === 'pc') {
+          setDeviceMode(savedDevice);
+          setDeviceSelected(true);
+        } else {
+          setDeviceSelected(true);
+        }
         if (parsed.email) {
           fetchNotes(parsed.email);
+        } else {
+          fetchNotes();
         }
-      } catch (e) {}
+      } catch (e) {
+        setDeviceSelected(false);
+        setOnboardingOpen(true);
+        fetchNotes();
+      }
+    } else {
+      setDeviceSelected(false);
+      setOnboardingOpen(true);
+      fetchNotes();
     }
 
     const savedRespected = localStorage.getItem('sp5_respected_notes');
@@ -288,10 +304,13 @@ function SzkolnaPodlogaApp() {
   const handleSelectDevice = (mode: 'mobile' | 'pc') => {
     setDeviceMode(mode);
     setDeviceSelected(true);
+    localStorage.setItem('sp5_device_mode', mode);
   };
 
   const handleSignOut = () => {
     setProfile(null);
+    localStorage.removeItem('sp5_user_session');
+    localStorage.removeItem('sp5_device_mode');
     localStorage.removeItem('sp5_student_profile');
     localStorage.removeItem('sp5_respected_notes');
     setRespectedNotes([]);
@@ -393,7 +412,9 @@ function SzkolnaPodlogaApp() {
           deviceMode: deviceMode
         };
         setProfile(userProfile);
+        localStorage.setItem('sp5_user_session', JSON.stringify(userProfile));
         localStorage.setItem('sp5_student_profile', JSON.stringify(userProfile));
+        localStorage.setItem('sp5_device_mode', deviceMode);
         setOnboardingOpen(false);
         fetchNotes(userProfile.email);
       }

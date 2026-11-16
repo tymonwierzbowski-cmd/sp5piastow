@@ -2,11 +2,18 @@ import type { Metadata } from "next";
 import "./podloga.css";
 
 export const metadata: Metadata = {
-  title: "Szkolna Podłoga SP5 Piastów — Porozrzucane Kartki Uczniów",
-  description: "Zostaw swoją kartkę z pamiątką na szkolnej podłodze SP5 Piastów. Wpisz imię, nazwisko i klasę, zobacz co zostawili inni uczniowie.",
-  keywords: ["sp5 piastow", "sp5 piastów", "szkoła podstawowa nr 5 piastów", "szkolna podłoga sp5", "sp5 piastow forum"],
+  title: "SP5 Piastów — Szkolna Podłoga | Kartki i Pamiątki Uczniów SP5",
+  description: "Zostaw swoją kartkę z pamiątką na szkolnej podłodze SP5 Piastów. Szkoła Podstawowa nr 5 Piastów (sp5 piastow, sp5piastow, sp5). Zobacz co zostawili inni uczniowie.",
+  keywords: [
+    "sp5 piastow",
+    "sp5 piastów",
+    "sp5",
+    "szkoła podstawowa nr 5 piastów",
+    "sp5piastow",
+    "szkolna podłoga sp5"
+  ],
   openGraph: {
-    title: "Szkolna Podłoga SP5 Piastów — Porozrzucane Kartki Uczniów",
+    title: "SP5 Piastów — Szkolna Podłoga | Kartki i Pamiątki Uczniów SP5",
     description: "Zostaw swoją kartkę z pamiątką na szkolnej podłodze SP5 Piastów.",
     type: "website",
   }
