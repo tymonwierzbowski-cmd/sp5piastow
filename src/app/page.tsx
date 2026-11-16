@@ -248,13 +248,24 @@ function SzkolnaPodlogaApp() {
   useEffect(() => {
     const savedSession = localStorage.getItem('sp5_user_session') || localStorage.getItem('sp5_student_profile');
     const savedDevice = localStorage.getItem('sp5_device_mode');
+    const isMobileWidth = typeof window !== 'undefined' && window.innerWidth <= 900;
+
+    if (isMobileWidth) {
+      setDeviceMode('mobile');
+    } else if (savedDevice === 'mobile' || savedDevice === 'pc') {
+      setDeviceMode(savedDevice);
+      setDeviceSelected(true);
+    }
 
     if (savedSession) {
       try {
         const parsed = JSON.parse(savedSession);
         setProfile(parsed);
         setOnboardingOpen(false);
-        if (savedDevice === 'mobile' || savedDevice === 'pc') {
+        if (isMobileWidth) {
+          setDeviceMode('mobile');
+          setDeviceSelected(true);
+        } else if (savedDevice === 'mobile' || savedDevice === 'pc') {
           setDeviceMode(savedDevice);
           setDeviceSelected(true);
         } else {
@@ -274,6 +285,10 @@ function SzkolnaPodlogaApp() {
       setDeviceSelected(false);
       setOnboardingOpen(true);
       fetchNotes();
+    }
+
+    if (isMobileWidth) {
+      setDeviceMode('mobile');
     }
 
     const savedRespected = localStorage.getItem('sp5_respected_notes');
