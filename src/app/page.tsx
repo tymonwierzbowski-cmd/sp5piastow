@@ -107,12 +107,42 @@ interface NoteCardProps {
   onResetRespect: (id: string, e: React.MouseEvent) => void;
 }
 
-function getNoteFontClass(text: string): string {
-  const len = text ? text.length : 0;
-  if (len <= 22) return 'sp5-font-xl';
-  if (len <= 65) return 'sp5-font-md';
-  if (len <= 115) return 'sp5-font-sm';
-  return 'sp5-font-xs';
+function getNoteStyle(text: string): React.CSSProperties {
+  const len = text ? text.trim().length : 0;
+  if (len <= 15) {
+    return {
+      fontSize: 'clamp(1.5rem, 4vw, 2.2rem)',
+      textAlign: 'center',
+      fontWeight: 700,
+      lineHeight: 1.15,
+      wordBreak: 'break-word',
+      overflowWrap: 'break-word'
+    };
+  } else if (len <= 40) {
+    return {
+      fontSize: 'clamp(1.2rem, 3vw, 1.65rem)',
+      textAlign: 'center',
+      lineHeight: 1.2,
+      wordBreak: 'break-word',
+      overflowWrap: 'break-word'
+    };
+  } else if (len <= 90) {
+    return {
+      fontSize: 'clamp(1rem, 2.2vw, 1.25rem)',
+      textAlign: 'left',
+      lineHeight: 1.25,
+      wordBreak: 'break-word',
+      overflowWrap: 'break-word'
+    };
+  } else {
+    return {
+      fontSize: 'clamp(0.82rem, 1.8vw, 0.98rem)',
+      textAlign: 'left',
+      lineHeight: 1.3,
+      wordBreak: 'break-word',
+      overflowWrap: 'break-word'
+    };
+  }
 }
 
 const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onRespect, onDelete, onMakeGold, onResetRespect }: NoteCardProps) => {
@@ -157,7 +187,7 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
         </div>
       )}
 
-      <div className={`sp5-card-message ${getNoteFontClass(note.message)}`}>„{note.message}”</div>
+      <div className="sp5-card-message" style={getNoteStyle(note.message)}>„{note.message}”</div>
       <div className="sp5-card-footer">
         <span className="sp5-card-signature-text">
           {note.first_name} {note.last_name} • {note.class_name}{' '}
@@ -1204,7 +1234,7 @@ function SzkolnaPodlogaApp() {
             className={`sp5-detail-card ${activeCard.paper_style}`}
             onClick={e => e.stopPropagation()}
           >
-            <div className={`sp5-detail-message ${getNoteFontClass(activeCard.message)}`}>„{activeCard.message}”</div>
+            <div className="sp5-detail-message" style={getNoteStyle(activeCard.message)}>„{activeCard.message}”</div>
 
             <div className="sp5-detail-footer">
               <span>
