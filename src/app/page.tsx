@@ -1048,7 +1048,7 @@ function SzkolnaPodlogaApp() {
                       style={{ background: 'transparent', border: 'none', color: '#93c5fd', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline' }}
                       onClick={() => { setAuthMode('reset'); setAuthError(''); setFormSuccess(''); }}
                     >
-                      Zapomniałeś hasła? Zresetuj hasło
+                      Nie pamiętasz hasła? Zresetuj je tutaj
                     </button>
                   </div>
                 )}
