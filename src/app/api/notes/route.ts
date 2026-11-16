@@ -10,20 +10,21 @@ const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supaba
 let inMemoryNotes: any[] = [];
 let inMemoryRespects: { user_email: string; note_id: string }[] = [];
 
-const profanityList = [
+const exactProfanities = [
   // Polish profanities & slurs
-  'kurw', 'chuj', 'pizd', 'jeb', 'huj', 'cip', 'pedal', 'skurw', 'pierd', 'fujara', 'kretyn', 'debil', 'idiot', 'suka', 'dziwka', 'szmata', 'pierdol', 'cipa', 'pizda', 'skurwysyn', 'frajer', 'ścierwo',
-  'murzyn', 'ciota', 'pedał', 'żyd', 'cipsk', 'kutas', 'ruch', 'rucha', 'ruchad', 'jebac', 'jebie', 'skurwysi', 'pierdolon', 'pierdoli', 'chujow', 'chujek', 'pizdo', 'dziwek', 'szmat',
+  'kurwa', 'kurwy', 'kurwie', 'kurwę', 'kurwią', 'chuj', 'huje', 'chuja', 'chujowi', 'chujem', 'pizda', 'pizdy', 'pizdzie', 'pizdę',
+  'jeb', 'jebać', 'jebany', 'jebana', 'jebane', 'jebnięty', 'pierdol', 'pierdolić', 'pierdolony', 'pierdolona',
+  'cipa', 'cipki', 'cipka', 'pedał', 'pedaly', 'pedali', 'skurwysyn', 'skurwiel', 'suka', 'sukę', 'suce',
+  'dziwka', 'dziwki', 'szmata', 'szmaty', 'kutas', 'kutasa', 'ciota', 'cioty', 'chujek', 'chujow', 'kretyn', 'debil', 'idiot',
+  'murzyn', 'murzynek', 'murzynka', 'nigger', 'nigga', 'nigg', 'negr', 'neger', 'n1gg', 'n!gg', 'nigg3r', 'nig9a',
   // English profanities & slurs
-  'fuck', 'shit', 'bitch', 'cunt', 'dick', 'cock', 'asshole', 'bastard', 'piss', 'slut', 'whore', 'retard', 'nigga', 'nigger', 'fag', 'faggot',
-  'coon', 'spic', 'kike', 'chink', 'dyke', 'tranny', 'motherfucker', 'cocksucker',
-  // N-word variants (PL & EN) with common leet/substitutions handled by normalization
-  'murzyn', 'murzynek', 'murzynka', 'nigger', 'nigga', 'nigg', 'negr', 'neger', 'n1gg', 'n!gg', 'nigg3r', 'nig9a'
+  'fuck', 'shit', 'bitch', 'cunt', 'dick', 'cock', 'asshole', 'bastard', 'piss', 'slut', 'whore', 'retard',
+  'fag', 'faggot', 'coon', 'spic', 'kike', 'chink', 'dyke', 'tranny', 'motherfucker', 'cocksucker'
 ];
 
-function normalizeText(text: string): string {
-  if (!text) return '';
-  return text
+function normalizeWord(word: string): string {
+  if (!word) return '';
+  return word
     .toLowerCase()
     .replace(/[ąęśćżźłóń]/g, match => {
       const map: { [key: string]: string } = {
@@ -42,12 +43,19 @@ function normalizeText(text: string): string {
 
 function containsProfanity(text: string): boolean {
   if (!text) return false;
-  const normalized = normalizeText(text);
-  const lower = text.toLowerCase();
+  // Split text into words by whitespace and punctuation
+  const words = text.toLowerCase().split(/[\s\p{P}\p{S}]+/u).filter(Boolean);
   
-  return profanityList.some(word => {
-    const normWord = normalizeText(word);
-    return normalized.includes(normWord) || lower.includes(word);
+  const normalizedProfanities = new Set(exactProfanities.map(p => normalizeWord(p)));
+
+  return words.some(rawWord => {
+    const norm = normalizeWord(rawWord);
+    if (!norm) return false;
+    if (normalizedProfanities.has(norm)) return true;
+
+    // Check specific root stems for heavy profanities (ensuring minimum length / strictness)
+    const stems = ['kurw', 'skurw', 'pierdol', 'jeb', 'huj', 'chuj'];
+    return stems.some(stem => norm === stem || (norm.startsWith(stem) && norm.length <= stem.length + 4));
   });
 }
 
