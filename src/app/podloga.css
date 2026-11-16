@@ -1140,4 +1140,70 @@ html, body {
     gap: 10px !important;
     width: 100% !important;
   }
+
+  .sp5-card {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: 125px !important;
+    padding: 10px 8px 26px 8px !important;
+  }
+
+  .sp5-card .sp5-card-admin-bar {
+    display: none !important;
+  }
+
+  .sp5-card .sp5-card-message {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 0.82rem !important;
+    line-height: 1.25 !important;
+    margin-bottom: 4px !important;
+  }
+
+  .sp5-card .sp5-card-footer {
+    position: absolute !important;
+    bottom: 6px !important;
+    left: 8px !important;
+    right: 8px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    font-size: 0.65rem !important;
+    border-top: 1px dashed rgba(0,0,0,0.15) !important;
+    padding-top: 4px !important;
+  }
+
+  .sp5-card .sp5-card-signature-text {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 70% !important;
+  }
+
+  .sp5-card .sp5-card-year-pc {
+    display: none !important;
+  }
+
+  .sp5-card .sp5-card-actions-desktop {
+    display: none !important;
+  }
+
+  .sp5-card .sp5-card-respect-badge-mobile {
+    display: inline-flex !important;
+    align-items: center !important;
+    font-weight: 700 !important;
+    font-size: 0.68rem !important;
+    background: rgba(0,0,0,0.08) !important;
+    padding: 2px 6px !important;
+    border-radius: 8px !important;
+  }
+
+  .sp5-card.gold .sp5-card-respect-badge-mobile {
+    background: rgba(251, 191, 36, 0.25) !important;
+    color: #fef08a !important;
+  }
 }

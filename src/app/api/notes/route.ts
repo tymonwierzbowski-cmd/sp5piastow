@@ -11,16 +11,44 @@ let inMemoryNotes: any[] = [];
 let inMemoryRespects: { user_email: string; note_id: string }[] = [];
 
 const profanityList = [
-  // Polish
-  'kurw', 'chuj', 'pizd', 'jeb', 'huj', 'cip', 'pedal', 'skurw', 'pierd', 'fujara', 'kretyn', 'debil', 'idiot', 'suka', 'dziwka', 'szmata', 'pierdol', 'cipa', 'pizda', 'skurwysyn', 'frajer', 'ścierwo', 'chuj', 'huj',
-  // English
-  'fuck', 'shit', 'bitch', 'cunt', 'dick', 'cock', 'asshole', 'bastard', 'piss', 'slut', 'whore', 'retard', 'nigga', 'nigger', 'fag', 'faggot'
+  // Polish profanities & slurs
+  'kurw', 'chuj', 'pizd', 'jeb', 'huj', 'cip', 'pedal', 'skurw', 'pierd', 'fujara', 'kretyn', 'debil', 'idiot', 'suka', 'dziwka', 'szmata', 'pierdol', 'cipa', 'pizda', 'skurwysyn', 'frajer', 'ścierwo',
+  'murzyn', 'ciota', 'pedał', 'żyd', 'cipsk', 'kutas', 'ruch', 'rucha', 'ruchad', 'jebac', 'jebie', 'skurwysi', 'pierdolon', 'pierdoli', 'chujow', 'chujek', 'pizdo', 'dziwek', 'szmat',
+  // English profanities & slurs
+  'fuck', 'shit', 'bitch', 'cunt', 'dick', 'cock', 'asshole', 'bastard', 'piss', 'slut', 'whore', 'retard', 'nigga', 'nigger', 'fag', 'faggot',
+  'coon', 'spic', 'kike', 'chink', 'dyke', 'tranny', 'motherfucker', 'cocksucker',
+  // N-word variants (PL & EN) with common leet/substitutions handled by normalization
+  'murzyn', 'murzynek', 'murzynka', 'nigger', 'nigga', 'nigg', 'negr', 'neger', 'n1gg', 'n!gg', 'nigg3r', 'nig9a'
 ];
+
+function normalizeText(text: string): string {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .replace(/[ąęśćżźłóń]/g, match => {
+      const map: { [key: string]: string } = {
+        'ą': 'a', 'ę': 'e', 'ś': 's', 'ć': 'c', 'ż': 'z', 'ź': 'z', 'ł': 'l', 'ó': 'o', 'ń': 'n'
+      };
+      return map[match] || match;
+    })
+    .replace(/[@4]/g, 'a')
+    .replace(/[3]/g, 'e')
+    .replace(/[1!]/g, 'i')
+    .replace(/[0]/g, 'o')
+    .replace(/[$5]/g, 's')
+    .replace(/[7]/g, 't')
+    .replace(/[^a-z0-9]/g, '');
+}
 
 function containsProfanity(text: string): boolean {
   if (!text) return false;
+  const normalized = normalizeText(text);
   const lower = text.toLowerCase();
-  return profanityList.some(word => lower.includes(word));
+  
+  return profanityList.some(word => {
+    const normWord = normalizeText(word);
+    return normalized.includes(normWord) || lower.includes(word);
+  });
 }
 
 function getClientIp(req: Request): string {

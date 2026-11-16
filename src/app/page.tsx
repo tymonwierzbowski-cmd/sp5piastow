@@ -151,11 +151,12 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
 
       <div className="sp5-card-message">„{note.message}”</div>
       <div className="sp5-card-footer">
-        <span>
-          {note.first_name} {note.last_name} • {note.class_name} • {note.year_written}{' '}
+        <span className="sp5-card-signature-text">
+          {note.first_name} {note.last_name} • {note.class_name}{' '}
+          <span className="sp5-card-year-pc">{'• ' + note.year_written}</span>{' '}
           {isNoteCreator && '👑'}
         </span>
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+        <div className="sp5-card-actions-desktop" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <button
             className={`sp5-respect-btn respect-action ${isRespected ? 'disabled' : ''}`}
             onClick={(e) => {
@@ -182,6 +183,9 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
           >
             👎 Unszacun
           </button>
+        </div>
+        <div className="sp5-card-respect-badge-mobile" style={{ display: 'none' }}>
+          👏 {note.respect_count}
         </div>
       </div>
     </div>
