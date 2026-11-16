@@ -1130,8 +1130,52 @@ html, body {
     box-sizing: border-box !important;
   }
 
+  .sp5-header {
+    padding: 12px 12px 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .sp5-title-area h1 {
+    font-size: 1.15rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .sp5-title-area p {
+    font-size: 0.78rem !important;
+    margin-bottom: 6px !important;
+  }
+
+  .sp5-hud-stats {
+    padding: 7px 10px !important;
+    gap: 4px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .sp5-search-input,
+  .sp5-action-btn {
+    padding: 8px 12px !important;
+    font-size: 0.84rem !important;
+    min-height: 38px !important;
+  }
+
   .sp5-filters-bar {
     flex-wrap: wrap !important;
+  }
+
+  .sp5-filter-pill {
+    padding: 5px 10px !important;
+    font-size: 0.76rem !important;
+    min-height: 32px !important;
+  }
+
+  .sp5-fab-container {
+    bottom: 12px !important;
+  }
+
+  .sp5-fab {
+    padding: 11px 18px !important;
+    font-size: 0.9rem !important;
+    min-height: 42px !important;
   }
 
   .sp5-floor-grid {
