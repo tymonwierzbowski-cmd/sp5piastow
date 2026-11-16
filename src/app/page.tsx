@@ -107,6 +107,14 @@ interface NoteCardProps {
   onResetRespect: (id: string, e: React.MouseEvent) => void;
 }
 
+function getNoteFontClass(text: string): string {
+  const len = text ? text.length : 0;
+  if (len <= 22) return 'sp5-font-xl';
+  if (len <= 65) return 'sp5-font-md';
+  if (len <= 115) return 'sp5-font-sm';
+  return 'sp5-font-xs';
+}
+
 const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onRespect, onDelete, onMakeGold, onResetRespect }: NoteCardProps) => {
   const isNoteCreator =
     note.first_name.toLowerCase() === 'tymon' &&
@@ -149,7 +157,7 @@ const NoteCard = React.memo(({ note, isCreator, isRespected, onCardClick, onResp
         </div>
       )}
 
-      <div className="sp5-card-message">„{note.message}”</div>
+      <div className={`sp5-card-message ${getNoteFontClass(note.message)}`}>„{note.message}”</div>
       <div className="sp5-card-footer">
         <span className="sp5-card-signature-text">
           {note.first_name} {note.last_name} • {note.class_name}{' '}
@@ -1196,7 +1204,7 @@ function SzkolnaPodlogaApp() {
             className={`sp5-detail-card ${activeCard.paper_style}`}
             onClick={e => e.stopPropagation()}
           >
-            <div className="sp5-detail-message">„{activeCard.message}”</div>
+            <div className={`sp5-detail-message ${getNoteFontClass(activeCard.message)}`}>„{activeCard.message}”</div>
 
             <div className="sp5-detail-footer">
               <span>
