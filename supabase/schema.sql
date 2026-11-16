@@ -58,3 +58,20 @@ create index if not exists idx_sp5_notes_ip on public.sp5_notes(ip_address);
 create index if not exists idx_sp5_notes_email on public.sp5_notes(user_email);
 create index if not exists idx_sp5_accounts_email on public.sp5_accounts(email);
 create index if not exists idx_sp5_respects_email_note on public.sp5_respects(user_email, note_id);
+
+-- Verification codes table for Gmail OTP
+create table if not exists public.sp5_verification_codes (
+  id uuid default gen_random_uuid() primary key,
+  email text not null,
+  code text not null,
+  expires_at timestamp with time zone not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.sp5_verification_codes enable row level security;
+
+create policy "Allow public read access verification_codes" on public.sp5_verification_codes for select using (true);
+create policy "Allow public insert access verification_codes" on public.sp5_verification_codes for insert with check (true);
+create policy "Allow public delete access verification_codes" on public.sp5_verification_codes for delete using (true);
+
+create index if not exists idx_sp5_verification_email on public.sp5_verification_codes(email);

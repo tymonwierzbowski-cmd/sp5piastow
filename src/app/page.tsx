@@ -263,6 +263,58 @@ function SzkolnaPodlogaApp() {
   const [formSuccess, setFormSuccess] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
+  const [verificationCodeInput, setVerificationCodeInput] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  const handleSwitchAuthMode = (mode: 'signin' | 'signup' | 'reset') => {
+    setAuthMode(mode);
+    setAuthError('');
+    setFormSuccess('');
+    setVerificationCodeInput('');
+    setCountdown(0);
+  };
+
+  const handleSendVerificationCode = async () => {
+    setAuthError('');
+    setFormSuccess('');
+    const emailClean = emailInput.trim().toLowerCase();
+    if (!emailClean) {
+      setAuthError('Wpisz adres Gmail przed wysłaniem kodu.');
+      return;
+    }
+
+    setSendingCode(true);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_code', email: emailClean })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error || 'Nie udało się wysłać kodu weryfikacyjnego.');
+      } else {
+        setFormSuccess('Kod weryfikacyjny został wysłany na Twój Gmail! Sprawdź skrzynkę odbiorczą (i spam).');
+        setCountdown(30);
+      }
+    } catch (err: any) {
+      setAuthError('Błąd połączenia podczas wysyłania kodu: ' + (err.message || err));
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -420,11 +472,20 @@ function SzkolnaPodlogaApp() {
       }
     }
 
+    if (authMode === 'signup' || authMode === 'reset') {
+      if (!verificationCodeInput || verificationCodeInput.trim().length !== 6) {
+        setAuthError('Wpisz 6-cyfrowy kod weryfikacyjny z wiadomości e-mail.');
+        setAuthLoading(false);
+        return;
+      }
+    }
+
     try {
       let endpointPayload: any = {
         action: authMode === 'signup' ? 'register' : authMode === 'signin' ? 'login' : 'reset_password',
         email: emailClean,
-        password: passwordClean
+        password: passwordClean,
+        code: verificationCodeInput.trim()
       };
 
       if (authMode === 'signup') {
@@ -453,7 +514,7 @@ function SzkolnaPodlogaApp() {
 
       if (authMode === 'reset') {
         setFormSuccess('Hasło zostało pomyślnie zmienione! Zaloguj się nowym hasłem.');
-        setAuthMode('signin');
+        handleSwitchAuthMode('signin');
         setNewPasswordInput('');
         setPasswordInput('');
         setAuthLoading(false);
@@ -970,7 +1031,7 @@ function SzkolnaPodlogaApp() {
                     <button
                       type="button"
                       style={{ background: 'transparent', border: 'none', color: '#93c5fd', fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: 0 }}
-                      onClick={() => { setAuthMode('signin'); setAuthError(''); setFormSuccess(''); }}
+                      onClick={() => handleSwitchAuthMode('signin')}
                     >
                       ← Wróć do logowania
                     </button>
@@ -980,14 +1041,14 @@ function SzkolnaPodlogaApp() {
                     <button
                       type="button"
                       style={{ flex: 1, background: authMode === 'signin' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px 4px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-                      onClick={() => { setAuthMode('signin'); setAuthError(''); setFormSuccess(''); }}
+                      onClick={() => handleSwitchAuthMode('signin')}
                     >
                       Zaloguj się
                     </button>
                     <button
                       type="button"
                       style={{ flex: 1, background: authMode === 'signup' ? '#2563eb' : 'transparent', border: 'none', color: '#fff', padding: '8px 4px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-                      onClick={() => { setAuthMode('signup'); setAuthError(''); setFormSuccess(''); }}
+                      onClick={() => handleSwitchAuthMode('signup')}
                     >
                       Załóż konto
                     </button>
@@ -1001,8 +1062,8 @@ function SzkolnaPodlogaApp() {
                   {authMode === 'signin'
                     ? 'Podaj swój adres Gmail i hasło, aby wejść na podłogę.'
                     : authMode === 'signup'
-                    ? 'Załóż konto podając adres Gmail, hasło, imię, nazwisko i klasę.'
-                    : 'Podaj adres Gmail, imię oraz klasę w celu szybkiego ustawienia nowego hasła.'}
+                    ? 'Załóż konto podając adres Gmail, kod z maila, hasło, imię, nazwisko i klasę.'
+                    : 'Podaj adres Gmail, kod z maila, imię oraz klasę w celu szybkiego ustawienia nowego hasła.'}
                 </p>
 
                 {authError && <div className="sp5-error-msg">{authError}</div>}
@@ -1020,6 +1081,40 @@ function SzkolnaPodlogaApp() {
                       required
                     />
                   </div>
+
+                  {(authMode === 'signup' || authMode === 'reset') && (
+                    <div className="sp5-form-group">
+                      <label className="sp5-form-label">6-cyfrowy kod weryfikacyjny z Gmaila</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          className="sp5-form-input"
+                          placeholder="np. 123456"
+                          maxLength={6}
+                          value={verificationCodeInput}
+                          onChange={e => setVerificationCodeInput(e.target.value)}
+                          required
+                          style={{ letterSpacing: '4px', fontWeight: 'bold', fontSize: '1.1rem' }}
+                        />
+                        <button
+                          type="button"
+                          className="sp5-btn-secondary"
+                          onClick={handleSendVerificationCode}
+                          disabled={sendingCode || countdown > 0}
+                          style={{ whiteSpace: 'nowrap', minWidth: '150px', fontSize: '0.85rem' }}
+                        >
+                          {sendingCode
+                            ? 'Wysyłanie...'
+                            : countdown > 0
+                            ? `Wyślij pon. (${countdown}s)`
+                            : 'Wyślij kod na Gmail'}
+                        </button>
+                      </div>
+                      <small style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        Kliknij „Wyślij kod na Gmail”, a następnie wpisz 6-cyfrowy kod otrzymany w wiadomości e-mail.
+                      </small>
+                    </div>
+                  )}
 
                   {authMode !== 'reset' && (
                     <div className="sp5-form-group" style={{ position: 'relative' }}>
@@ -1132,7 +1227,7 @@ function SzkolnaPodlogaApp() {
                     <button
                       type="button"
                       style={{ background: 'transparent', border: 'none', color: '#93c5fd', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline' }}
-                      onClick={() => { setAuthMode('reset'); setAuthError(''); setFormSuccess(''); }}
+                      onClick={() => handleSwitchAuthMode('reset')}
                     >
                       Nie pamiętasz hasła? Zresetuj je tutaj
                     </button>

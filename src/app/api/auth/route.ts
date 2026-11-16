@@ -1,12 +1,30 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_role_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
-let inMemoryAccounts: any[] = [];
+interface Account {
+  email: string;
+  password_hash: string;
+  first_name: string;
+  last_name: string;
+  class_name: string;
+  created_at: string;
+}
+
+interface VerificationCodeRecord {
+  email: string;
+  code: string;
+  expires_at: string;
+}
+
+const inMemoryAccounts: Account[] = [];
+const inMemoryVerificationCodes: VerificationCodeRecord[] = [];
 
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
@@ -20,10 +38,49 @@ function isValidSp5Class(className: string): boolean {
   return match !== null;
 }
 
+async function verifyAndConsumeCode(emailClean: string, codeInput: string): Promise<{ success: boolean; error?: string }> {
+  if (!codeInput || codeInput.trim().length !== 6) {
+    return { success: false, error: 'Wpisz poprawny 6-cyfrowy kod weryfikacyjny z wiadomości e-mail.' };
+  }
+
+  const cleanCode = codeInput.trim();
+  const nowIso = new Date().toISOString();
+
+  if (!supabase) {
+    const idx = inMemoryVerificationCodes.findIndex(
+      v => v.email === emailClean && v.code === cleanCode && v.expires_at > nowIso
+    );
+    if (idx === -1) {
+      return { success: false, error: 'Kod weryfikacyjny jest błędny lub wygasł. Wyślij nowy kod.' };
+    }
+    inMemoryVerificationCodes.splice(idx, 1);
+    return { success: true };
+  }
+
+  const { data: vRecord, error: vErr } = await supabase
+    .from('sp5_verification_codes')
+    .select('*')
+    .eq('email', emailClean)
+    .eq('code', cleanCode)
+    .gt('expires_at', nowIso)
+    .maybeSingle();
+
+  if (vErr || !vRecord) {
+    return { success: false, error: 'Kod weryfikacyjny jest błędny lub wygasł. Wyślij nowy kod.' };
+  }
+
+  await supabase
+    .from('sp5_verification_codes')
+    .delete()
+    .eq('id', vRecord.id);
+
+  return { success: true };
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, email, password, new_password, first_name, last_name, class_name } = body;
+    const { action, email, password, new_password, first_name, last_name, class_name, code } = body;
 
     if (!email) {
       return NextResponse.json({ error: 'Adres Gmail jest wymagany.' }, { status: 400 });
@@ -31,9 +88,95 @@ export async function POST(req: Request) {
 
     const emailClean = email.trim().toLowerCase();
 
+    if (action === 'send_code') {
+      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+      console.log(`[SP5 OTP] Generated code for ${emailClean}: ${generatedCode}`);
+
+      if (!supabase) {
+        const filtered = inMemoryVerificationCodes.filter(v => v.email !== emailClean);
+        inMemoryVerificationCodes.length = 0;
+        inMemoryVerificationCodes.push(...filtered, { email: emailClean, code: generatedCode, expires_at: expiresAt });
+      } else {
+        await supabase.from('sp5_verification_codes').delete().eq('email', emailClean);
+        const { error: insCodeErr } = await supabase
+          .from('sp5_verification_codes')
+          .insert([{ email: emailClean, code: generatedCode, expires_at: expiresAt }]);
+        if (insCodeErr) {
+          return NextResponse.json({ error: 'Błąd bazy danych przy zapisie kodu: ' + insCodeErr.message }, { status: 500 });
+        }
+      }
+
+      const gmailUser = process.env.GMAIL_USER;
+      const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
+      const resendApiKey = process.env.RESEND_API_KEY;
+
+      try {
+        if (gmailUser && gmailAppPassword) {
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: gmailUser,
+              pass: gmailAppPassword
+            }
+          });
+          await transporter.sendMail({
+            from: `"Szkolna Podłoga SP5 Piastów" <${gmailUser}>`,
+            to: emailClean,
+            subject: 'Kod weryfikacyjny - Szkolna Podłoga SP5 Piastów',
+            text: `Twój 6-cyfrowy kod weryfikacyjny to: ${generatedCode}. Kod jest ważny przez 10 minut.`,
+            html: `<div style="font-family:sans-serif;padding:20px;background:#f9f9f9;border-radius:8px;max-width:500px;margin:auto;">
+              <h2 style="color:#2563eb;">Szkolna Podłoga SP5 Piastów</h2>
+              <p>Oto Twój jednorazowy kod weryfikacyjny:</p>
+              <div style="background:#fff;border:1px solid #e5e7eb;padding:16px;border-radius:6px;text-align:center;font-size:32px;font-weight:bold;letter-spacing:6px;color:#1e293b;margin:16px 0;">
+                ${generatedCode}
+              </div>
+              <p style="color:#64748b;font-size:14px;">Kod jest ważny przez 10 minut. Jeśli nie prosiłeś o ten kod, zignoruj tę wiadomość.</p>
+            </div>`
+          });
+        } else if (resendApiKey) {
+          const resend = new Resend(resendApiKey);
+          const { error: resendError } = await resend.emails.send({
+            from: 'Szkolna Podłoga SP5 <onboarding@resend.dev>',
+            to: emailClean,
+            subject: 'Kod weryfikacyjny - Szkolna Podłoga SP5 Piastów',
+            html: `<div style="font-family:sans-serif;padding:20px;background:#f9f9f9;border-radius:8px;max-width:500px;margin:auto;">
+              <h2 style="color:#2563eb;">Szkolna Podłoga SP5 Piastów</h2>
+              <p>Oto Twój jednorazowy kod weryfikacyjny:</p>
+              <div style="background:#fff;border:1px solid #e5e7eb;padding:16px;border-radius:6px;text-align:center;font-size:32px;font-weight:bold;letter-spacing:6px;color:#1e293b;margin:16px 0;">
+                ${generatedCode}
+              </div>
+              <p style="color:#64748b;font-size:14px;">Kod jest ważny przez 10 minut. Jeśli nie prosiłeś o ten kod, zignoruj tę wiadomość.</p>
+            </div>`
+          });
+          if (resendError) {
+            throw new Error(resendError.message || 'Błąd wysyłki Resend');
+          }
+        } else {
+          return NextResponse.json({
+            error: 'Brak skonfigurowanych danych wysyłki e-mail (ustaw GMAIL_USER i GMAIL_APP_PASSWORD lub RESEND_API_KEY).'
+          }, { status: 400 });
+        }
+
+        return NextResponse.json({ success: true, message: 'Kod weryfikacyjny został wysłany na podany adres Gmail!' });
+      } catch (mailErr: unknown) {
+        const errorMessage = mailErr instanceof Error ? mailErr.message : 'Błąd SMTP/Resend';
+        console.error('Mail send error:', mailErr);
+        return NextResponse.json({
+          error: 'Nie udało się wysłać wiadomości e-mail: ' + errorMessage + '. Sprawdź poprawność adresu Gmail lub konfigurację serwera.'
+        }, { status: 500 });
+      }
+    }
+
     if (action === 'register') {
       if (!password || !first_name || !last_name || !class_name) {
         return NextResponse.json({ error: 'Wszystkie pola (hasło, imię, nazwisko, klasa) są wymagane.' }, { status: 400 });
+      }
+
+      const verifyRes = await verifyAndConsumeCode(emailClean, code);
+      if (!verifyRes.success) {
+        return NextResponse.json({ error: verifyRes.error }, { status: 400 });
       }
 
       if (password.trim().length < 6) {
@@ -55,7 +198,7 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: 'To konto Gmail jest już zarejestrowane – przełącz na zakładkę Zaloguj się!' }, { status: 400 });
         }
 
-        const newAccount = {
+        const newAccount: Account = {
           email: emailClean,
           password_hash: passwordHash,
           first_name: firstNameClean,
@@ -76,8 +219,7 @@ export async function POST(req: Request) {
         });
       }
 
-      // Check if account already exists
-      const { data: existingUser, error: checkErr } = await supabase
+      const { data: existingUser } = await supabase
         .from('sp5_accounts')
         .select('email')
         .eq('email', emailClean)
@@ -162,6 +304,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Wymagane jest nowe hasło, imię oraz klasa w celu weryfikacji tożsamości.' }, { status: 400 });
       }
 
+      const verifyRes = await verifyAndConsumeCode(emailClean, code);
+      if (!verifyRes.success) {
+        return NextResponse.json({ error: verifyRes.error }, { status: 400 });
+      }
+
       if (new_password.trim().length < 6) {
         return NextResponse.json({ error: 'Nowe hasło musi mieć co najmniej 6 znaków.' }, { status: 400 });
       }
@@ -202,7 +349,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ error: 'Nieznana akcja.' }, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ error: 'Wystąpił błąd serwera: ' + err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : 'Nieznany błąd';
+    return NextResponse.json({ error: 'Wystąpił błąd serwera: ' + errMessage }, { status: 500 });
   }
 }
