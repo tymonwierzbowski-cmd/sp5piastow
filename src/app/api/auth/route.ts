@@ -65,14 +65,22 @@ async function verifyAndConsumeCode(emailClean: string, codeInput: string): Prom
     .gt('expires_at', nowIso)
     .maybeSingle();
 
-  if (vErr || !vRecord) {
+  if (vErr) {
+    return { success: false, error: 'Błąd połączenia z bazą: ' + vErr.message };
+  }
+
+  if (!vRecord) {
     return { success: false, error: 'Kod weryfikacyjny jest błędny lub wygasł. Wyślij nowy kod.' };
   }
 
-  await supabase
+  const { error: delErr } = await supabase
     .from('sp5_verification_codes')
     .delete()
     .eq('id', vRecord.id);
+
+  if (delErr) {
+    return { success: false, error: 'Błąd połączenia z bazą: ' + delErr.message };
+  }
 
   return { success: true };
 }
@@ -99,12 +107,15 @@ export async function POST(req: Request) {
         inMemoryVerificationCodes.length = 0;
         inMemoryVerificationCodes.push(...filtered, { email: emailClean, code: generatedCode, expires_at: expiresAt });
       } else {
-        await supabase.from('sp5_verification_codes').delete().eq('email', emailClean);
+        const { error: delErr } = await supabase.from('sp5_verification_codes').delete().eq('email', emailClean);
+        if (delErr) {
+          return NextResponse.json({ error: 'Błąd połączenia z bazą: ' + delErr.message }, { status: 500 });
+        }
         const { error: insCodeErr } = await supabase
           .from('sp5_verification_codes')
           .insert([{ email: emailClean, code: generatedCode, expires_at: expiresAt }]);
         if (insCodeErr) {
-          return NextResponse.json({ error: 'Błąd bazy danych przy zapisie kodu: ' + insCodeErr.message }, { status: 500 });
+          return NextResponse.json({ error: 'Błąd połączenia z bazą: ' + insCodeErr.message }, { status: 500 });
         }
       }
 
@@ -164,7 +175,7 @@ export async function POST(req: Request) {
         const errorMessage = mailErr instanceof Error ? mailErr.message : 'Błąd SMTP/Resend';
         console.error('Mail send error:', mailErr);
         return NextResponse.json({
-          error: 'Nie udało się wysłać wiadomości e-mail: ' + errorMessage + '. Sprawdź poprawność adresu Gmail lub konfigurację serwera.'
+          error: 'Błąd wysyłki e-mail: ' + errorMessage
         }, { status: 500 });
       }
     }
@@ -219,11 +230,15 @@ export async function POST(req: Request) {
         });
       }
 
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error: existingErr } = await supabase
         .from('sp5_accounts')
         .select('email')
         .eq('email', emailClean)
         .maybeSingle();
+
+      if (existingErr) {
+        return NextResponse.json({ error: 'Błąd połączenia z bazą: ' + existingErr.message }, { status: 500 });
+      }
 
       if (existingUser) {
         return NextResponse.json({ error: 'To konto Gmail jest już zarejestrowane – przełącz na zakładkę Zaloguj się!' }, { status: 400 });
@@ -240,7 +255,7 @@ export async function POST(req: Request) {
         }]);
 
       if (insertErr) {
-        return NextResponse.json({ error: insertErr.message }, { status: 500 });
+        return NextResponse.json({ error: 'Błąd połączenia z bazą: ' + insertErr.message }, { status: 500 });
       }
 
       return NextResponse.json({
@@ -284,7 +299,11 @@ export async function POST(req: Request) {
         .eq('email', emailClean)
         .maybeSingle();
 
-      if (queryErr || !account || account.password_hash !== passwordHash) {
+      if (queryErr) {
+        return NextResponse.json({ error: 'Błąd połączenia z bazą: ' + queryErr.message }, { status: 500 });
+      }
+
+      if (!account || account.password_hash !== passwordHash) {
         return NextResponse.json({ error: 'Błędny adres Gmail lub hasło!' }, { status: 401 });
       }
 
@@ -332,7 +351,11 @@ export async function POST(req: Request) {
         .eq('email', emailClean)
         .maybeSingle();
 
-      if (queryErr || !account || account.first_name.toLowerCase() !== fNameClean || account.class_name.toUpperCase() !== cNameClean) {
+      if (queryErr) {
+        return NextResponse.json({ error: 'Błąd połączenia z bazą: ' + queryErr.message }, { status: 500 });
+      }
+
+      if (!account || account.first_name.toLowerCase() !== fNameClean || account.class_name.toUpperCase() !== cNameClean) {
         return NextResponse.json({ error: 'Podany adres Gmail nie zgadza się z imieniem lub klasą w bazie!' }, { status: 400 });
       }
 
@@ -342,7 +365,7 @@ export async function POST(req: Request) {
         .eq('email', emailClean);
 
       if (updateErr) {
-        return NextResponse.json({ error: updateErr.message }, { status: 500 });
+        return NextResponse.json({ error: 'Błąd połączenia z bazą: ' + updateErr.message }, { status: 500 });
       }
 
       return NextResponse.json({ success: true, message: 'Hasło zostało pomyślnie zmienione!' });
